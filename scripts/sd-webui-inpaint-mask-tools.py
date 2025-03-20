@@ -18,7 +18,7 @@ from modules.script_callbacks import on_ui_settings
 from modules.ui_components import ToolButton
 
 SCRIPT_NAME = "Inpaint Mask Tools"
-MEGA = 1024 * 1024
+MEGA = 1000 * 1000
 MULTIPLY_FACTOR = 1.1
 WHOLEPICTURE_SAFEGUARD_TOLERANCE = 0.03  # 3%
 
