@@ -31,11 +31,11 @@ The following img2img parameters are set:
 
 Using these dimensions for inpainting is one of the most common mistakes A1111 users make. It’s easy to overlook, but it significantly impacts quality.  
 
-[!NOTE]
-It's some sort of common knowledge and also a misconception (usually found on websites like Civitai) that "_SDXL-based checkpoints are trained on 1024x1024 datasets, and any other dimension won't work well_". Whoever wrote that is probably still living in a cave, unaware of Bucketing (which allows multiple aspect ratios in a dataset) and the fact that modern models can generate much larger images without issue.
+> [!NOTE]
+> It's some sort of common knowledge and also a misconception (usually found on websites like Civitai) that "_SDXL-based checkpoints are trained on 1024x1024 datasets, and any other dimension won't work well_". Whoever wrote that is probably still living in a cave, unaware of Bucketing (which allows multiple aspect ratios in a dataset) and the fact that modern models can generate much larger images without issue.
 
-[!TIP]
-Extensive experimenting by the author of this repository has shown that most modern models rely more on target *resolution* rather than specific *dimensions*. Nowadays, NoobAI-based checkpoints can easily generate rawgens between 1 Mp (e.g., 1024×1024) and 2 Mp (e.g., 1600×1200). While most PDXLv6 checkpoints perform best at basegens below 1.5 Mp, some models - such as Rainpony Rainfall v2 - can generate txt2img outputs approaching 1.8 Mp. Inpainting at low denoising strengths (<0.45, depending heavily on the sampler) allows for even higher resolutions, typically up to 2–2.2 Mp. However, it is true that models struggle to produce quality outputs below the resolutions they were trained on.
+> [!TIP]
+> Extensive experimenting by the author of this repository has shown that most modern models rely more on target *resolution* rather than specific *dimensions*. Nowadays, NoobAI-based checkpoints can easily generate rawgens between 1 Mp (e.g., 1024×1024) and 2 Mp (e.g., 1600×1200). While most PDXLv6 checkpoints perform best at basegens below 1.5 Mp, some models - such as Rainpony Rainfall v2 - can generate txt2img outputs approaching 1.8 Mp. Inpainting at low denoising strengths (<0.45, depending heavily on the sampler) allows for even higher resolutions, typically up to 2–2.2 Mp. However, it is true that models struggle to produce quality outputs below the resolutions they were trained on.
 
 Now, let’s see what results our chosen values will yield - citing the A1111 source code along the way!  
 
@@ -44,8 +44,8 @@ The masked area is [converted to the black and white](https://github.com/AUTOMAT
 
 Next, a [Gaussian Blur is applied along both axes](https://github.com/AUTOMATIC1111/stable-diffusion-webui/blob/82a973c04367123ae98bd9abdf80d9eda9b910e2/modules/processing.py#L1630) of the mask:
 ![Blurred mask](images/parakeet-example/005-blurry-mask.png)
-[!WARNING]
-Notice how the "expansion dots" are **almost washed out**. This means that if the Mask Blur value is set too high, your area expansion marks will disappear, rendering them ineffective. For the smallest brush size in A1111 WebUI, a Mask Blur value of 16 appears to be the upper limit.
+> [!WARNING]
+> Notice how the "expansion dots" are **almost washed out**. This means that if the Mask Blur value is set too high, your area expansion marks will disappear, rendering them ineffective. For the smallest brush size in A1111 WebUI, a Mask Blur value of 16 appears to be the upper limit.
 
 Then, the conditional branch is executed because we are using the "Only masked" mode. The crop region is calculated, which is essentially _[a bounding box around the blurred mask with added padding](https://github.com/AUTOMATIC1111/stable-diffusion-webui/blob/82a973c04367123ae98bd9abdf80d9eda9b910e2/modules/masking.py#L6)_ (32 pixels on each side in our case).
 
@@ -70,8 +70,8 @@ The backend then saves the coordinates where the final image should be injected,
 Let's zoom in on the generated result:
 ![The parakeet's wing inpainted at 1024x1024 dimensions](images/parakeet-example/010-output-close-up.jpg)
 
-[!CAUTION]
-The masked area in WebUI originally had dimensions of 1798x1024 - a whopping 1.8 Megapixels devoted solely to the parakeet’s wing and upper body. The model **can** denoise effectively at this resolution. However, due to how A1111 handles Width and Height, the input provided to the model is reduced to 1024x1024 (1 Mp), with an effective inpainting area of just 987x545 (0.54 Mp). Yes, you read that correctly: the backend has inserted a **987x545** image into a **1798x1024** region, resulting in a poorly resized, low-detail, crappy output. **As a result, we have lost 3.4 times the model's potential capabilities.**
+> [!CAUTION]
+> The masked area in WebUI originally had dimensions of 1798x1024 - a whopping 1.8 Megapixels devoted solely to the parakeet’s wing and upper body. The model **can** denoise effectively at this resolution. However, due to how A1111 handles Width and Height, the input provided to the model is reduced to 1024x1024 (1 Mp), with an effective inpainting area of just 987x545 (0.54 Mp). Yes, you read that correctly: the backend has inserted a **987x545** image into a **1798x1024** region, resulting in a poorly resized, low-detail, crappy output. **As a result, we have lost 3.4 times the model's potential capabilities.**
 
 Now, let's reuse the same seed and all other generation parameters - but this time, enable the extension, which will automatically measure and adjust the masked area dimensions. Here's the updated crop calculation:
 ```crop_region=(1030, 487, 2828, 1511)
@@ -110,6 +110,9 @@ Inpainting a 600×248 area with a cutting-edge model will never yield the best r
 
 If you do *segmented inpainting* of some huge canvas consider keeping this value at 0 (disabling Auto-Upscaling) and relying on Quick Controls instead. However, setting it to 1.8–2.5 MP while drawing slightly smaller masks can improve detail.
 
+> [!NOTE]
+> This feature is in Beta, and it only works well when the padding and blur do not go beyond the border of the image. In these edge cases Autoupscaling still works but yields much lesser precision. It would be great to cover these situations in the future.
+
 **This option is only active when Autoadjusting is enabled.**
 
 ### Whole Picture inpainting safeguard
@@ -131,7 +134,7 @@ Caveat: if you are changing the Upscale factor by typing it into the field, **ma
 ## Development
 I consider this extension feature-complete. However, there is some room for potential improvement:
 * Run all calculations client-side without sending the data to back-end, allowing the user hitting the quick controls buttons while generating some images without any additional wait time. Implementing this requires good knowledge of JavaScript.
-* Write tests for quirky edge-cases.
+* Write tests for quirky edge-cases especially for Autoupscaling.
 
 If you are looking for additional functionality, feel free to make a Pull Request with your code!
 
@@ -140,7 +143,7 @@ This project is licensed under GPL v3, except for a small piece of code borrowed
 This project uses [ruff](https://github.com/astral-sh/ruff) and [biome](https://github.com/biomejs/biome) for enforcing the consistent code style for Python and Javascript, respectively.
 
 ## Compatibility
-This extension has been tested with A1111 WebUI v1.9.3 and v1.10, they are based on Gradio v3. Please report back if this extension also works with Gradio 4-based UIs.
+This extension has been tested with A1111 WebUI v1.9.3 and v1.10.1, they are based on Gradio v3. Please report back if this extension also works with Gradio 4-based UIs.
 
 Regarding compatibility with reForge: this front-end seems to ignore all notification pop-ups generated by Gradio. While this extension sends notifications, the messages are also duplicated in the log.
 

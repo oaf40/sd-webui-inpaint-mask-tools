@@ -37,7 +37,7 @@ onUiLoaded(() => {
 	// Reapply quick controls labels because Gradio doesn't allow setting arbitrary
 	// HTML tags as values from Python without creating a custom control.
 	new Map([
-		["img2img_imt_calc_round_plus_blur", "🎭<sup>B</sup>"],
+		["img2img_imt_calc_blur_pad_round", "🎭<sup>BP</sup>"],
 		["img2img_imt_calc_raw", "🎭<sup>RAW</sup>"],
 	]).forEach((v, k, m) => {
 		gradioApp().getElementById(k).innerHTML = v;

@@ -8,3 +8,10 @@
 	text-orientation: upright;
 	font-size: 0.5em;
 }
+
+#img2img_imt_calc_blur_pad_round {
+    background: linear-gradient(to bottom right, var(--primary-50), var(--primary-100));
+}
+#img2img_imt_calc_blur_pad_round:hover {
+    background: linear-gradient(to bottom right, var(--primary-50), var(--primary-50));
+}
