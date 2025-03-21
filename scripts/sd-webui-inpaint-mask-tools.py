@@ -302,8 +302,8 @@ class MaskDimensionsScript(scripts.Script):
         """
 
         # Allow some slight drift (defined by `WHOLEPICTURE_SAFEGUARD_TOLERANCE`)
-        # in width and height in "Whole picture" mode because such usecases are
-        # most likely legit use cases of resizing an image at high denoising strengths.
+        # in width and height in "Whole picture" mode because most likely these
+        # are legit use cases of resizing an image at high denoising strengths.
         tolerance_ok = np.allclose(
             p.init_images[0].size,
             (p.width, p.height),
