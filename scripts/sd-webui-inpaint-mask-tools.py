@@ -226,7 +226,7 @@ class MaskDimensionsScript(scripts.Script):
         # EAFP, too many edge-cases to check especially when the Inpaint UI
         # glitches out displaying small cropped preview of an image
         try:
-            if not (mask and (bbox := get_crop_region_v2(mask))[0]):
+            if not (mask and (bbox := get_crop_region_v2(mask))):
                 raise RuntimeError()
         except:  # noqa: E722
             gr.Error("Cannot access the mask")
@@ -331,14 +331,17 @@ class MaskDimensionsScript(scripts.Script):
         log_line: str = f"Requested {original_width}x{original_height}"
 
         if not p.inpaint_full_res:
-            logger.warning(f"{log_line}, but not in Only masked mode")
-            return p  # Not in "Only masked mode", bail out
+            logger.warning(f"{log_line}, but not in Only masked mode. Bail out.")
+            return p  # Not in "Only masked mode"
 
         # Calculate aspect ratio of the raw mask
         imt_mask = create_binary_mask(original_mask)
-        if p.inpainting_mask_invert:
-            imt_mask = ImageOps.invert(imt_mask)
-        imt_width, imt_height, _ = measure_bbox(get_crop_region_v2(imt_mask))
+        imt_width, imt_height = self.imt_calculate_bbox(CalcMode.RAW, imt_mask, 0, 0, p.inpainting_mask_invert, -1, -1)
+        if imt_width == -1:  # parent function failed for whatever reason, most likely
+            # because the user hasn't drawn any mask *and* didn't toggle the Inverse option.
+            logger.warning(f"{log_line}, but failed to measure the raw mask. Bail out.")
+            return p
+
         imt_aspect_ratio = imt_width / imt_height
 
         imt_width, imt_height, imt_resolution = self.imt_calculate_bbox(
