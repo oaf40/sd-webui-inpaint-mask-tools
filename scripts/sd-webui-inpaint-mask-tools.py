@@ -44,7 +44,7 @@ logger = logging.getLogger(f"[{SCRIPT_NAME}]")
 logger.setLevel(logging.INFO)
 
 
-def round_by_8(val: int) -> int:
+def round_by_8(val: float) -> int:
     """
     Round up the value to the nearest multiple of 8
     :param val: source value
@@ -82,6 +82,12 @@ class MaskDimensionsScript(scripts.Script):
         # The script will be active only in img2img mode, and we will  also hide
         # the UI controls on the client-side when the Inpaint tab is inactive.
         return scripts.AlwaysVisible if is_img2img else False
+
+    # Store references to the core UI elements
+    def after_component(self, component, **kwargs):
+        for ui_cid in self.ui_components:
+            if kwargs.get("elem_id") == ui_cid:
+                self.ui_components[ui_cid] = component
 
     def ui(self, is_img2img: bool):
         if not is_img2img:
@@ -149,6 +155,19 @@ class MaskDimensionsScript(scripts.Script):
 
         return None
 
+    # Do our thing and let the rest of the workflow run as usual
+    def process(self, p: StableDiffusionProcessingImg2Img) -> StableDiffusionProcessingImg2Img:
+        if not p.image_mask:  # we need a mask to work
+            return
+
+        if shared.opts.imt_wholepicture_safeguard:
+            p = self.imt_process_wholepicture_safeguard(p)
+        if shared.opts.imt_autoadjust_onlymasked:
+            p = self.imt_process_autoadjust_onlymasked(p)
+        if shared.opts.imt_multipleof8_safeguard:
+            p = self.imt_process_multipleof8_safeguard(p)
+        return p
+
     def imt_on_calc_raw(self, canvas: dict, blur: int, padding: int, inv: int, fallback_width: int,
                         fallback_height: int) -> tuple[int, int]:
         """
@@ -202,7 +221,7 @@ class MaskDimensionsScript(scripts.Script):
     ) -> tuple[int, int]:
         """
         Multiply width and height by MULTIPLY_FACTOR and round up each value to the nearest multiple of 8.
-        :param mask: not used
+        :param canvas: not used
         :param blur: not used
         :param padding: not used
         :param inv: not used
@@ -251,25 +270,7 @@ class MaskDimensionsScript(scripts.Script):
             return round_by_8(imt_width), round_by_8(imt_height)
 
         # Calculate accounting for blur and padding
-        mask_blur_x = blur
-        mask_blur_y = blur
-
-        # Unfortunately A1111 doesn't have a standalone function for blurring
-        # the mask, so I had to copy-paste and adapt the code from there.
-        # Reference: modules/processing.py , commit 1c0a0c4c (v1.9.3)
-        # SPDX-SnippetBegin
-        # SPDX-License-Identifier: AGPL-3.0-only
-        # SPDX-SnippetCopyrightText: 2022 AUTOMATIC1111 and contributors
-        if mask_blur_x > 0:
-            np_mask = np.array(imt_mask)
-            kernel_size = 2 * int(2.5 * mask_blur_x + 0.5) + 1
-            np_mask = cv2.GaussianBlur(np_mask, (kernel_size, 1), mask_blur_x)
-            imt_mask = Image.fromarray(np_mask)
-        if mask_blur_y > 0:
-            np_mask = np.array(imt_mask)
-            kernel_size = 2 * int(2.5 * mask_blur_y + 0.5) + 1
-            np_mask = cv2.GaussianBlur(np_mask, (1, kernel_size), mask_blur_y)
-            imt_mask = Image.fromarray(np_mask)
+        imt_mask = self.imt_apply_blur(imt_mask, blur, blur)  # same blur factor for X and Y axes
 
         imt_mask = imt_mask.convert("L")
         bbox = get_crop_region_v2(imt_mask, padding)
@@ -285,18 +286,32 @@ class MaskDimensionsScript(scripts.Script):
             # return resolution as well when calling from inside
             return imt_width, imt_height, imt_resolution
 
-    # Do our thing and let the rest of the workflow run as usual
-    def process(self, p: StableDiffusionProcessingImg2Img) -> StableDiffusionProcessingImg2Img:
-        if not p.image_mask:  # we need a mask to work
-            return
+    def imt_apply_blur(self, image: Image, blur_x: int, blur_y: int) -> Image:
+        """
+        Apply Gaussian blur to the image, the code was taken from the original WebUI
+        :param image: source image
+        :param blur_x: horizontal blur factor
+        :param blur_y: vertical blur factor
+        :return: blurred image
+        """
 
-        if shared.opts.imt_wholepicture_safeguard:
-            p = self.imt_process_wholepicture_safeguard(p)
-        if shared.opts.imt_autoadjust_onlymasked:
-            p = self.imt_process_autoadjust_onlymasked(p)
-        if shared.opts.imt_multipleof8_safeguard:
-            p = self.imt_process_multipleof8_safeguard(p)
-        return p
+        # Reference: modules/processing.py , commit 1c0a0c4c (v1.9.3)
+        # SPDX-SnippetBegin
+        # SPDX-License-Identifier: AGPL-3.0-only
+        # SPDX-SnippetCopyrightText: 2022 AUTOMATIC1111 and contributors
+        if blur_x > 0:
+            np_image = np.array(image)
+            kernel_size = 2 * int(2.5 * blur_x + 0.5) + 1
+            np_image = cv2.GaussianBlur(np_image, (kernel_size, 1), blur_x)
+            image = Image.fromarray(np_image)
+        if blur_y > 0:
+            np_image = np.array(image)
+            kernel_size = 2 * int(2.5 * blur_y + 0.5) + 1
+            np_image = cv2.GaussianBlur(np_image, (1, kernel_size), blur_y)
+            image = Image.fromarray(np_image)
+        # SPDX-SnippetEnd
+
+        return image
 
     def imt_process_wholepicture_safeguard(self,
                                            p: StableDiffusionProcessingImg2Img) -> StableDiffusionProcessingImg2Img:
@@ -391,12 +406,6 @@ class MaskDimensionsScript(scripts.Script):
         p.width = imt_width
         p.height = imt_height
         return p
-
-    # Store references to the core UI elements
-    def after_component(self, component, **kwargs):
-        for ui_cid in self.ui_components:
-            if kwargs.get("elem_id") == ui_cid:
-                self.ui_components[ui_cid] = component
 
     def imt_process_multipleof8_safeguard(self,
                                           p: StableDiffusionProcessingImg2Img) -> StableDiffusionProcessingImg2Img:
