@@ -44,7 +44,7 @@ logger = logging.getLogger(f"[{SCRIPT_NAME}]")
 logger.setLevel(logging.INFO)
 
 
-def round_by_8(val):
+def round_by_8(val: int) -> int:
     """
     Round up the value to the nearest multiple of 8
     :param val: source value
@@ -75,15 +75,15 @@ class MaskDimensionsScript(scripts.Script):
         "img2img_mask_mode": None,
     }
 
-    def title(self):
+    def title(self) -> str:
         return SCRIPT_NAME
 
-    def show(self, is_img2img):
+    def show(self, is_img2img: bool) -> bool:
         # The script will be active only in img2img mode, and we will  also hide
         # the UI controls on the client-side when the Inpaint tab is inactive.
         return scripts.AlwaysVisible if is_img2img else False
 
-    def ui(self, is_img2img):
+    def ui(self, is_img2img: bool):
         if not is_img2img:
             return
 
@@ -150,7 +150,7 @@ class MaskDimensionsScript(scripts.Script):
         return None
 
     def imt_on_calc_raw(self, canvas: dict, blur: int, padding: int, inv: int, fallback_width: int,
-                        fallback_height: int):
+                        fallback_height: int) -> tuple[int, int]:
         """
         Calculate the width and height of the bounding box surrounding the masked area
         :param canvas: ["image", "mask"]
@@ -159,12 +159,13 @@ class MaskDimensionsScript(scripts.Script):
         :param inv: not used
         :param fallback_width: fallback value if mask doesn't exist
         :param fallback_height: fallback value if mask doesn't exist
+        :return: width and height in pixels
         """
         mask = canvas.get("mask") if canvas else None
         return self.imt_calculate_bbox(CalcMode.RAW, mask, blur, padding, inv, fallback_width, fallback_height)
 
     def imt_on_calc_raw_round(self, canvas: dict, blur: int, padding: int, inv: int, fallback_width: int,
-                              fallback_height: int):
+                              fallback_height: int) -> tuple[int, int]:
         """
         Calculate the width and height of the bounding box surrounding the masked area,
         round up the dimensions to the nearest multiple of 8.
@@ -174,12 +175,13 @@ class MaskDimensionsScript(scripts.Script):
         :param inv: not used
         :param fallback_width: fallback value if mask doesn't exist
         :param fallback_height: fallback value if mask doesn't exist
+        :return: width and height in pixels
         """
         mask = canvas.get("mask") if canvas else None
         return self.imt_calculate_bbox(CalcMode.RAW_ROUND, mask, blur, padding, inv, fallback_width, fallback_height)
 
     def imt_on_calc_blur_pad_round(self, canvas: dict, blur: int, padding: int, inv: int, fallback_width: int,
-                                   fallback_height: int):
+                                   fallback_height: int) -> tuple[int, int]:
         """
         Calculate the width and height of the bounding box surrounding the masked area while
         accounting for blur and padding, round up the dimensions to the nearest multiple of 8.
@@ -189,6 +191,7 @@ class MaskDimensionsScript(scripts.Script):
         :param inv: mask inversion flag
         :param fallback_width: fallback value if mask doesn't exist
         :param fallback_height: fallback value if mask doesn't exist
+        :return: width and height in pixels
         """
         mask = canvas.get("mask") if canvas else None
         return self.imt_calculate_bbox(CalcMode.BLUR_PAD_ROUND, mask, blur, padding, inv, fallback_width,
@@ -196,7 +199,7 @@ class MaskDimensionsScript(scripts.Script):
 
     def imt_on_calc_multiply(
             self, canvas: dict, blur: int, padding: int, inv: int, width: int, height: int
-    ):
+    ) -> tuple[int, int]:
         """
         Multiply width and height by MULTIPLY_FACTOR and round up each value to the nearest multiple of 8.
         :param mask: not used
@@ -205,11 +208,12 @@ class MaskDimensionsScript(scripts.Script):
         :param inv: not used
         :param width: value to multiply
         :param height: value to multiply
+        :return: width and height in pixels
         """
         return round_by_8(width * MULTIPLY_FACTOR), round_by_8(height * MULTIPLY_FACTOR)
 
     def imt_calculate_bbox(self, calc_mode: CalcMode, mask: Image, blur: int, padding: int, inv: int,
-                           fallback_width: int, fallback_height: int):
+                           fallback_width: int, fallback_height: int) -> tuple[int, int] | tuple[int, int, float]:
         """
         Common function for calculating the bounding box around the masked area.
         Account for blur and padding if requested.
@@ -221,6 +225,7 @@ class MaskDimensionsScript(scripts.Script):
         :param inv: mask inversion flag
         :param fallback_width: fallback value if mask doesn't exist
         :param fallback_height: fallback value if mask doesn't exist
+        :return: the tuple of (width, height) OR (width, height, resolution) if calc_mode == CalcMode.BLUR_PAD
         """
 
         # EAFP, too many edge-cases to check especially when the Inpaint UI
