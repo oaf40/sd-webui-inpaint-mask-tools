@@ -3,7 +3,7 @@
 
 import logging
 from enum import auto, Enum
-from math import sqrt
+from math import ceil, sqrt
 from textwrap import dedent
 
 import cv2
@@ -46,11 +46,11 @@ logger.setLevel(logging.INFO)
 
 def round_by_8(val):
     """
-    Round the value to the nearest multiple of 8
+    Round up the value to the nearest multiple of 8
     :param val: source value
     :return: rounded value
     """
-    return int(round(val / 8) * 8)
+    return int(ceil((val if val > 0 else 1) / 8) * 8)
 
 
 def measure_bbox(bbox: tuple[int, int, int, int]) -> tuple[int, int, float]:
@@ -167,7 +167,7 @@ class MaskDimensionsScript(scripts.Script):
                               fallback_height: int):
         """
         Calculate the width and height of the bounding box surrounding the masked area,
-        round the dimensions to the nearest multiple of 8.
+        round up the dimensions to the nearest multiple of 8.
         :param canvas: ["image", "mask"]
         :param blur: not used
         :param padding: not used
@@ -182,7 +182,7 @@ class MaskDimensionsScript(scripts.Script):
                                    fallback_height: int):
         """
         Calculate the width and height of the bounding box surrounding the masked area while
-        accounting for blur and padding, round the dimensions to the nearest multiple of 8.
+        accounting for blur and padding, round up the dimensions to the nearest multiple of 8.
         :param canvas: ["image", "mask"]
         :param blur: blur factor
         :param padding: pad N pixels on each side
@@ -198,7 +198,7 @@ class MaskDimensionsScript(scripts.Script):
             self, canvas: dict, blur: int, padding: int, inv: int, width: int, height: int
     ):
         """
-        Multiply width and height by MULTIPLY_FACTOR and round each value to the nearest multiple of 8.
+        Multiply width and height by MULTIPLY_FACTOR and round up each value to the nearest multiple of 8.
         :param mask: not used
         :param blur: not used
         :param padding: not used
@@ -213,7 +213,7 @@ class MaskDimensionsScript(scripts.Script):
         """
         Common function for calculating the bounding box around the masked area.
         Account for blur and padding if requested.
-        Round the values to the nearest multiple of 8 if requested.
+        Round up the values to the nearest multiple of 8 if requested.
         :param calc_mode: calculation mode
         :param mask: mask
         :param blur: blur factor
@@ -396,7 +396,7 @@ class MaskDimensionsScript(scripts.Script):
     def imt_process_multipleof8_safeguard(self,
                                           p: StableDiffusionProcessingImg2Img) -> StableDiffusionProcessingImg2Img:
         """
-        Automatically round width and height to the nearest multiple of 8
+        Automatically round up width and height to the nearest multiple of 8
         :param p: img2img job data
         """
         old_width = p.width
@@ -440,7 +440,7 @@ def imt_init_settings():
             section=section,
         ).info(
             dedent("""Upscale the width and height if the masked area's resolution 
-        is below the specified value. The upscaled values are rounded to the 
+        is below the specified value. The upscaled values are rounded up to the 
         nearest multiple of 8, causing minimal impact on the original aspect 
         ratio. Set to 0 to disable this option. <b>Recommended values: 1–1.5</b>.
         The current implementation does NOT work well when the padding exceeds the
