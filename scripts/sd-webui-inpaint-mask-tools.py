@@ -22,22 +22,12 @@ MEGA = 1000 * 1000
 MULTIPLY_FACTOR = 1.1
 WHOLEPICTURE_SAFEGUARD_TOLERANCE = 0.03  # 3%
 
-# A1111 allows setting Mask Blur values between 0 and 64 (inclusive). It's hard to
-# calculate how many pixels each value will add to width and height so the LUT was
-# generated instead. See `measure-blur.py` for details. Access: BLUR_DELTAS[blur]
-BLUR_DELTAS = [
-    0, 6, 10, 16, 20, 26, 30, 36, 40, 44, 48, 54, 58, 64, 68, 74,
-    78, 84, 88, 92, 96, 102, 106, 112, 116, 122, 126, 132, 136, 140, 144, 150,
-    154, 160, 164, 170, 174, 180, 184, 188, 192, 198, 202, 208, 212, 218, 222, 228,
-    232, 238, 242, 246, 250, 256, 260, 266, 270, 276, 280, 286, 290, 294, 298, 304, 308
-]
-
 
 class CalcMode(Enum):
     RAW = auto()
     RAW_ROUND = auto()
-    BLUR_PAD = auto()  # to be used in Autoadjusting algorithm
     BLUR_PAD_ROUND = auto()
+    INTERNAL = auto()  # used in Autoadjusting algorithm
 
 
 logger = logging.getLogger(f"[{SCRIPT_NAME}]")
@@ -231,8 +221,16 @@ class MaskDimensionsScript(scripts.Script):
         """
         return round_by_8(width * MULTIPLY_FACTOR), round_by_8(height * MULTIPLY_FACTOR)
 
-    def imt_calculate_bbox(self, calc_mode: CalcMode, mask: Image, blur: int, padding: int, inv: int,
-                           fallback_width: int, fallback_height: int) -> tuple[int, int] | tuple[int, int, float]:
+    def imt_calculate_bbox(
+            self,
+            calc_mode: CalcMode,
+            mask: Image,
+            blur: int,
+            padding: int,
+            inv: int,
+            fallback_width: int,
+            fallback_height: int
+    ) -> tuple[int, int] | tuple[float, int, int, float, tuple]:
         """
         Common function for calculating the bounding box around the masked area.
         Account for blur and padding if requested.
@@ -244,13 +242,14 @@ class MaskDimensionsScript(scripts.Script):
         :param inv: mask inversion flag
         :param fallback_width: fallback value if mask doesn't exist
         :param fallback_height: fallback value if mask doesn't exist
-        :return: the tuple of (width, height) OR (width, height, resolution) if calc_mode == CalcMode.BLUR_PAD
+        :return: (raw aspect ratio, B&P width, B&P height, B&P resolution, blurred bbox) for CalcMode.INTERNAL
+        :return: (width, height) for all other CalcModes.
         """
 
         # EAFP, too many edge-cases to check especially when the Inpaint UI
         # glitches out displaying small cropped preview of an image
         try:
-            if not (mask and (bbox := get_crop_region_v2(mask))):
+            if not (mask and get_crop_region_v2(mask)):
                 raise RuntimeError()
         except:  # noqa: E722
             gr.Error("Cannot access the mask")
@@ -260,21 +259,19 @@ class MaskDimensionsScript(scripts.Script):
         imt_mask = create_binary_mask(mask)
         if inv:
             imt_mask = ImageOps.invert(imt_mask)
-        bbox = get_crop_region_v2(imt_mask)
+        bbox = get_crop_region_v2(imt_mask)  # raw bbox
 
         imt_width, imt_height, _ = measure_bbox(bbox)
+        imt_aspect_ratio = imt_width / imt_height
         if calc_mode == CalcMode.RAW:
             return imt_width, imt_height
-
-        if calc_mode == CalcMode.RAW_ROUND:
+        elif calc_mode == CalcMode.RAW_ROUND:
             return round_by_8(imt_width), round_by_8(imt_height)
 
         # Calculate accounting for blur and padding
         imt_mask = self.imt_apply_blur(imt_mask, blur, blur)  # same blur factor for X and Y axes
-
         imt_mask = imt_mask.convert("L")
         bbox = get_crop_region_v2(imt_mask, padding)
-        # SPDX-SnippetEnd
         if not bbox:
             logger.warning("The mask doesn't exist, check if the Mask Blur value is too big")
             return fallback_width, fallback_height
@@ -282,9 +279,11 @@ class MaskDimensionsScript(scripts.Script):
         imt_width, imt_height, imt_resolution = measure_bbox(bbox)
         if calc_mode == CalcMode.BLUR_PAD_ROUND:
             return round_by_8(imt_width), round_by_8(imt_height)
-        else:  # calc_mode == CalcMode.BLUR_PAD
-            # return resolution as well when calling from inside
-            return imt_width, imt_height, imt_resolution
+        elif calc_mode == CalcMode.INTERNAL:
+            return imt_aspect_ratio, imt_width, imt_height, imt_resolution, get_crop_region_v2(imt_mask, 0)
+        else:
+            logger.error("Unhandled calc_mode!")
+            return fallback_width, fallback_height
 
     def imt_apply_blur(self, image: Image, blur_x: int, blur_y: int) -> Image:
         """
@@ -314,11 +313,13 @@ class MaskDimensionsScript(scripts.Script):
         return image
 
     def imt_process_wholepicture_safeguard(self,
-                                           p: StableDiffusionProcessingImg2Img) -> StableDiffusionProcessingImg2Img:
+                                           p: StableDiffusionProcessingImg2Img,
+                                           force=False) -> StableDiffusionProcessingImg2Img:
         """
         Interrupt generating when user forgets to switch from "Whole picture" to the
         "Masked area" inpainting mode.
         :param p: img2img job data
+        :param force: force the check regardless of the Inpaint mode
         """
 
         # Allow some slight drift (defined by `WHOLEPICTURE_SAFEGUARD_TOLERANCE`)
@@ -330,7 +331,7 @@ class MaskDimensionsScript(scripts.Script):
             WHOLEPICTURE_SAFEGUARD_TOLERANCE,
             0,
         )
-        if not p.inpaint_full_res and not tolerance_ok:
+        if (force or not p.inpaint_full_res) and not tolerance_ok:
             msg = """Detected unusual dimensions set for the \"Whole
                 picture\" mode. Did you mean to use \"Only masked\" instead?"""
             shared.state.interrupt()
@@ -351,37 +352,44 @@ class MaskDimensionsScript(scripts.Script):
         log_line: str = f"Requested {original_width}x{original_height}"
 
         if not p.inpaint_full_res:
-            logger.warning(f"{log_line}, but not in Only masked mode. Bail out.")
-            return p  # Not in "Only masked mode"
-
-        # Calculate aspect ratio of the raw mask
-        imt_mask = create_binary_mask(original_mask)
-        imt_width, imt_height = self.imt_calculate_bbox(CalcMode.RAW, imt_mask, 0, 0, p.inpainting_mask_invert, -1, -1)
-        if imt_width == -1:  # parent function failed for whatever reason, most likely
-            # because the user hasn't drawn any mask *and* didn't toggle the Inverse option.
-            logger.warning(f"{log_line}, but failed to measure the raw mask. Bail out.")
+            logger.warning(f"{log_line}, but not in Only masked mode. Nothing for us to do.")
             return p
 
-        imt_aspect_ratio = imt_width / imt_height
-
-        imt_width, imt_height, imt_resolution = self.imt_calculate_bbox(
-            CalcMode.BLUR_PAD, original_mask, p.mask_blur_x, p.inpaint_full_res_padding, p.inpainting_mask_invert, -1,
+        values = self.imt_calculate_bbox(
+            CalcMode.INTERNAL, original_mask, p.mask_blur_x, p.inpaint_full_res_padding, p.inpainting_mask_invert, -1,
             -1
         )
-        if imt_width == -1:
-            logger.warning(f"{log_line}, but the mask doesn't exist")
-            return p  # There's no mask, nothing to do
+        if values[0] == -1:
+            # Parent function failed for whatever reason, most likely because the
+            # user hasn't drawn any mask *and* didn't toggle the Inverse option.
+            logger.warning(f"{log_line}, but failed to measure the raw mask. Bail out.")
+            # At this point A1111 might quietly start a full run of unmasked img2img, and it's
+            # prone to shrunk image error. Force the check before leaving.
+            return self.imt_process_wholepicture_safeguard(p, True)
+        # imt_aspect_ratio: aspect ratio of the raw mask (no blur, no padding); used in autoupscaling
+        # imt_width: measured width of blurred and padded mask
+        # imt_height: measured height of blurred and padded mask
+        # imt_resolution: resolution of blurred and padded mask
+        # bbox_blurred: coordinates of the bounding box of the blurred mask (no padding); used in autoupscaling
+        imt_aspect_ratio, imt_width, imt_height, imt_resolution, bbox_blurred = values
         log_line += f", measured {imt_width}x{imt_height} ({round(imt_resolution, 2)} Mp)"
 
-        # TODO: Currently this code does NOT account for cases when the padding goes beyond the bound of the
-        # image, more complex arithmetics is required. While the current implementation of upscaling covers most
-        # situations it will yield worse results in various edge-cases.
+        # Autoupscaling routines
         if imt_resolution < shared.opts.imt_autoadjust_upscaleto:
-            # For now the padding and blur are equal on each side, but it might change in A1111 in the future
-            padW = p.inpaint_full_res_padding * 2
-            padH = p.inpaint_full_res_padding * 2
-            blurW = BLUR_DELTAS[p.mask_blur_x]
-            blurH = BLUR_DELTAS[p.mask_blur_y]
+            bbox_original = original_mask.getbbox()
+            # Width and height added by gaussian blur (in pixels)
+            blurW = (bbox_original[0] - bbox_blurred[0]) + (bbox_blurred[2] - bbox_original[2])  # (left) + (right)
+            blurH = (bbox_original[1] - bbox_blurred[1]) + (bbox_blurred[3] - bbox_original[3])  # (top) + (bottom)
+
+            # Width and height added by padding the blurred mask (in pixels)
+            def calc_space(allowance: int, requested: int) -> int:
+                return max(min(allowance, requested), 0)
+
+            padW = calc_space(bbox_blurred[0], p.inpaint_full_res_padding) + \
+                   calc_space(original_mask.size[0] - bbox_blurred[2], p.inpaint_full_res_padding)  # (left) + (right)
+            padH = calc_space(bbox_blurred[1], p.inpaint_full_res_padding) + \
+                   calc_space(original_mask.size[1] - bbox_blurred[3], p.inpaint_full_res_padding)  # (top) + (bottom)
+
             # Calculate new width and height based on the target resolution
             target_resolution = shared.opts.imt_autoadjust_upscaleto * MEGA
             # The calculations below were derived from the following equation:
@@ -390,7 +398,7 @@ class MaskDimensionsScript(scripts.Script):
             b = (padW + blurW) + imt_aspect_ratio * (padH + blurH)
             imt_height = (-b + sqrt(
                 b * b - 4 * imt_aspect_ratio * ((padW + blurW) * (padH + blurH) - target_resolution))) / (
-                                     2 * imt_aspect_ratio)
+                                 2 * imt_aspect_ratio)
 
             imt_width = int(imt_aspect_ratio * imt_height) + blurW + padW
             imt_height = int(imt_height) + blurH + padH
@@ -448,7 +456,7 @@ def imt_init_settings():
         "imt_autoadjust_upscaleto",
         shared.OptionInfo(
             0,
-            "[BETA] Upscale small areas to resolution (Mpx)",
+            "Upscale small areas to resolution (Mpx)",
             gr.Slider,
             {"minimum": 0, "maximum": 4, "step": 0.1},
             section=section,
@@ -456,9 +464,7 @@ def imt_init_settings():
             dedent("""Upscale the width and height if the masked area's resolution 
         is below the specified value. The upscaled values are rounded up to the 
         nearest multiple of 8, causing minimal impact on the original aspect 
-        ratio. Set to 0 to disable this option. <b>Recommended values: 1–1.5</b>.
-        The current implementation does NOT work well when the padding exceeds the
-        borders of the original image, and it will use less precise dimensions""")  # noqa: W291
+        ratio. Set to 0 to disable this option. <b>Recommended values: 1–1.5</b>.""")  # noqa: W291
         ),
     )
     shared.opts.add_option(

@@ -110,9 +110,6 @@ Inpainting a 600×248 area with a cutting-edge model will never yield the best r
 
 If you do *segmented inpainting* of some huge canvas consider keeping this value at 0 (disabling Auto-Upscaling) and relying on Quick Controls instead. However, setting it to 1.8–2.5 MP while drawing slightly smaller masks can improve detail.
 
-> [!NOTE]
-> This feature is in Beta, and it only works well when the padding and blur do not go beyond the border of the image. In these edge cases Autoupscaling still works but yields much lesser precision. It would be great to cover these situations in the future.
-
 **This option is only active when Autoadjusting is enabled.**
 
 ### Whole Picture inpainting safeguard
