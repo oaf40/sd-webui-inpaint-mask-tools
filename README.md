@@ -1,11 +1,71 @@
 ![Inpaint Mask Tools](images/001-header.jpg)
 
-## Introduction
-Inpaint Mask Tools is an extension for A1111 (compatible with reForge) designed to enhance the inpainting experience, making it significantly more user-friendly. Whether you are a beginner or an experienced effortgenner, this extension will provide valuable assistance.
+## TL;DR
+Managing the correct aspect ratio and target resolution for inpainting masks is very important to pull the most out of your model. This extension allows you to do this automatically along with few other useful features. IMT is designed to be automatic _and_ non-intrusive, meaning you can still be in full control of your workflow if you wish.
 
-The default settings help prevent some of the most common mistakes made by A1111 users.
+## Quick start
+1. Install the extension in WebUI (A1111, reForge)
+2. Restart UI to make the IMT settings appear in WebUI
+3. Navigate to Settings, find the Quicksettings list, add all the 4 IMT settings: `imt_autoadjust_onlymasked`, `imt_autoadjust_upscaleto`, `imt_wholepicture_safeguard`, `imt_multipleof8_safeguard`.
+4. Reload UI to apply the changes. 4 new settings will now appear on top of the UI.
+5. **Apply recommended settings**:
+* ✅ Autoadjust Width and Height in "Only masked" mode
+* Upscale small areas to resolution (Mpx): **1.0**
+* ✅ "Whole picture" inpainting safeguard
+* ✅ Auto-round width & height to ×8
 
-## How it works and why you need this extension
+(changes will take into effect immediately)
+
+## Table of Contents
+1. [Features](#features)
+2. [How it works and why you need this extension: a detailed explanation](#how-it-works-and-why-you-need-this-extension-a-detailed-explanation)
+3. [Development](#development)
+4. [Compatibility](#compatibility)
+
+## Features
+### Autoadjusting Width and Height in "Only masked" mode.
+No more inpainting elongated areas at the default 1024×1024 resolution! This feature is an essential tool for high-quality inpainting. It is primarily intended for users working with low-resolution rawgens (typically under 2 megapixels) but can also be effectively leveraged by experienced users when paired with an appropriate upscaling factor (more on this below).
+
+When enabled alongside the "Only Masked" mode, this option overrides any values set in the "Resize to" tab (even those applied by the quick controls). Instead, the extension automatically recalculates and applies the optimal width and height based on the dimensions of the masked area.
+
+### Autoupscaling mask area if its resolution is too low
+Most modern models, trained primarily on 1024px+ datasets, struggle to produce high-quality inpaints at lower resolutions while excelling at their native and slightly higher resolutions.
+
+Inpainting a 600×248 area with a cutting-edge model will never yield the best results. To address this, enable Auto-Upscaling: if the masked area’s resolution is *lower* than the specified target, it will be upscaled to meet the defined threshold. Recommended values: 1–1.5 MP, though some models can handle 2–2.3 MP effectively.
+
+If you do *segmented inpainting* of some huge canvas consider keeping this value at 0 (disabling Auto-Upscaling) and relying on Quick Controls instead. However, setting it to 1.8–2.5 MP while drawing slightly smaller masks can improve detail.
+
+**This option is only active when Autoadjusting is enabled.**
+
+### Quick controls for mask dimensions
+![Quick controls](images/002-quick-controls.png)
+
+The extension adds four buttons to the Inpainting tab of the img2img section, providing tools to measure the masked area. This is especially useful for users working with high-resolution images (3K and above) who rely on the "Only masked" inpainting mode.
+
+The quick controls allow for the calculation of different mask areas, with the most useful button factoring in both Blur and Padding settings. These controls are only available when the Inpaint tab is active and are disabled for all other img2img modes.
+
+The calculations are useful for estimating the capabilities of your model/GPU before submitting an actual compute job to the backend. For example, you have drawn quite a big mask, and you know your GPU will OOM at dimensions higher than 1600x1200 so to ensure you won't crash the backend or wait way too much you can click the "RAW" button to see the dimensions of your current mask without accounting for blur and padding.
+
+> [!NOTE]
+> The current implementation sends both mask *and* the image from the front-end to the back-end which causes a spike of network usage and very noticeable delay with large images and/or WebUI instances running on remote machines. This is the limitation of Gradio and currently nothing could be done about it, except there is some potential in rewriting the measurements in Javascript to run them on the client side.
+
+### Whole Picture inpainting safeguard
+Prevents wasting time on generating unintentionally shrunk images. This feature detects unusual dimensions in Whole Picture mode and immediately halts generation. A slight variation in resolution is permitted, as minor shrinking or expansion by a few pixels is often intentional.
+![Whole Picture inpainting safeguard](images/003-whole-picture-inpainting-safeguard.jpg)
+
+### Auto-rounding width and height to multiple of 8
+This is a common mistake that can occur due to an accidental typo. If the width or height are not multiples of 8, the resulting image will have visual glitches on the edges of inpainted areas. Example:
+
+![Multiple of 8 glitch example](images/004-multiple-of-8-glitch.png)
+
+### Quicksettings List integration
+Allows you to adjust the necessary options in a convenient way. Changes come into effect the next time the "Generate" button is clicked. Type `imt_` into the Quicksettings search bar to locate the 4 available options.
+
+![Quicksettings List integration](images/005-quicksettings-list.jpg)
+
+Caveat: if you are changing the Upscale factor by typing it into the field, **make sure to hit Enter to apply it**. Alternatively, you can use the slider, which automatically applies the changes.
+
+## How it works and why you need this extension: a detailed explanation
 It's important to understand how A1111 handles inpainting in "Only masked" mode under the hood. To keep things simple, we won’t dive too deep into the technical details but will instead focus on the general principles. The color images in this section are compressed as lossy JPEGs to reduce repository size.
 
 All images are generated from some sort of noise (hence the term "denoising"). The only difference between txt2img and img2img is the source of the noise the AI model receives as input. In pure txt2img mode the backend generates a canvas full of noise then performs N *inference steps* (where N is usually 15 to 40) to derive the desired image from this noise guided by the prompt. The "X/Y/Z plot" script helps visualize this process:
@@ -88,45 +148,6 @@ While this result shows a significant improvement over the previous image, there
 |----------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Increase the denoising strength                          | Doesn't require extra effort, making it a time-saving approach                                                                  | Higher denoising strength increases the risk of color inconsistencies and "malformed gens" (e.g., ghost limbs, double/triple body parts, and other unintended artifacts).                        |
 | Run N subsequent inpaints at the same denoising strength | Allows gradual quality improvement and granular quality control if `Batch Size > 1`. Can be automated using the Loopback script | Repeated inpainting without adjusting the mask makes the edges more pronounced. If Soft Inpainting is enabled the inpaint seams will be even more visible, requiring some manual post-processing |
-
-
-## Features
-### Quick controls for mask dimensions
-![Quick controls](images/002-quick-controls.png)
-
-The extension adds four buttons to the Inpainting tab of the img2img section, providing tools to measure the masked area. This is especially useful for users working with high-resolution images (3K and above) who rely on the "Only masked" inpainting mode.
-
-The quick controls allow for the calculation of different mask areas, with the most useful button factoring in both Blur and Padding settings. These controls are only available when the Inpaint tab is active and are disabled for all other img2img modes.
-
-## Autoadjusting Width and Height in "Only masked" mode.
-No more inpainting elongated areas at the default 1024×1024 resolution! This feature is an essential tool for high-quality inpainting. It is primarily intended for users working with low-resolution rawgens (typically under 2 megapixels) but can also be effectively leveraged by experienced users when paired with an appropriate upscaling factor (more on this below).
-
-When enabled alongside the "Only Masked" mode, this option overrides any values set in the "Resize to" tab (even those applied by the quick controls). Instead, the extension automatically recalculates and applies the optimal width and height based on the dimensions of the masked area.
-
-## Autoupscaling mask area if its resolution is too low
-Most modern models, trained primarily on 1024px+ datasets, struggle to produce high-quality inpaints at lower resolutions while excelling at their native and slightly higher resolutions.
-
-Inpainting a 600×248 area with a cutting-edge model will never yield the best results. To address this, enable Auto-Upscaling: if the masked area’s resolution is *lower* than the specified target, it will be upscaled to meet the defined threshold. Recommended values: 1–1.5 MP, though some models can handle 2–2.3 MP effectively.
-
-If you do *segmented inpainting* of some huge canvas consider keeping this value at 0 (disabling Auto-Upscaling) and relying on Quick Controls instead. However, setting it to 1.8–2.5 MP while drawing slightly smaller masks can improve detail.
-
-**This option is only active when Autoadjusting is enabled.**
-
-### Whole Picture inpainting safeguard
-Prevents wasted time on generating unintentionally shrunk images. This feature detects unusual dimensions in Whole Picture mode and immediately halts generation. A slight variation in resolution is permitted, as minor shrinking or expansion by a few pixels is often intentional.
-![Whole Picture inpainting safeguard](images/003-whole-picture-inpainting-safeguard.jpg)
-
-### Auto-rounding width and height to multiple of 8
-This is a common mistake that can occur due to an accidental typo. If the width or height are not multiples of 8, the resulting image will have visual glitches on the edges of inpainted areas. Example:
-
-![Multiple of 8 glitch example](images/004-multiple-of-8-glitch.png)
-
-### Quicksettings List integration
-Allows you to adjust the necessary options in a convenient way. Changes come into effect the next time the "Generate" button is clicked. Type `imt_` into the Quicksettings search bar to locate the 4 available options.
-
-![Quicksettings List integration](images/005-quicksettings-list.jpg)
-
-Caveat: if you are changing the Upscale factor by typing it into the field, **make sure to hit Enter to apply it**. Alternatively, you can use the slider, which automatically applies the changes.
 
 ## Development
 I consider this extension feature-complete. However, there is some room for potential improvement:
