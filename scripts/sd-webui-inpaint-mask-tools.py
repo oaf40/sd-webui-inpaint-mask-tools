@@ -461,7 +461,8 @@ def imt_init_settings():
             gr.Checkbox,
             section=section,
         ).info(
-            dedent("""Automatically override specified width and height when you click 
+            dedent("""\
+                Automatically override specified width and height when you click 
                 "Generate". Provides faster UX but less flexible: doesn't work 
                 well when the masked area is under 1 Mpx. <b>Check out the 
                 "Upscale" setting for better results!</b>""")  # noqa: W291
@@ -476,10 +477,11 @@ def imt_init_settings():
             {"minimum": 0, "maximum": 4, "step": 0.1},
             section=section,
         ).info(
-            dedent("""Upscale the width and height if the masked area's resolution 
-        is below the specified value. The upscaled values are rounded up to the 
-        nearest multiple of 8, causing minimal impact on the original aspect 
-        ratio. Set to 0 to disable this option. <b>Recommended values: 1–1.5</b>.""")  # noqa: W291
+            dedent("""\
+                Upscale the width and height if the masked area's resolution 
+                is below the specified value. The upscaled values are rounded up to the 
+                nearest multiple of 8, causing minimal impact on the original aspect 
+                ratio. Set to 0 to disable this option. <b>Recommended values: 1–1.5</b>.""")  # noqa: W291
         ),
     )
     shared.opts.add_option(
@@ -487,9 +489,10 @@ def imt_init_settings():
         shared.OptionInfo(
             True, '"Whole picture" inpainting safeguard', gr.Checkbox, section=section
         ).info(
-            dedent("""Prevent image generation in "Whole Picture" mode if the 
-        target dimensions exceed 3% of the original size. Helps avoid wasted 
-        time on shrunken images when "Only Masked" mode is not selected.""")  # noqa: W291
+            dedent("""\
+                Prevent image generation in "Whole Picture" mode if the 
+                target dimensions exceed 3% of the original size. Helps avoid wasted 
+                time on shrunken images when "Only Masked" mode is not selected.""")  # noqa: W291
         ),
     )
     shared.opts.add_option(
@@ -497,8 +500,9 @@ def imt_init_settings():
         shared.OptionInfo(
             True, "Auto-round width & height to ×8", gr.Checkbox, section=section
         ).info(
-            dedent("""Prevent nasty visual glitches on the edges of inpainted 
-        areas. Keeping this option enabled is recommended.""")  # noqa: W291
+            dedent("""\
+                Prevent nasty visual glitches on the edges of inpainted 
+                areas. Keeping this option enabled is recommended.""")  # noqa: W291
         ),
     )
 
