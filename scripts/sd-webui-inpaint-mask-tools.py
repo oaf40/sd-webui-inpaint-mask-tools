@@ -377,6 +377,21 @@ class MaskDimensionsScript(scripts.Script):
         # Autoupscaling routines
         if imt_resolution < shared.opts.imt_autoadjust_upscaleto:
             bbox_original = original_mask.getbbox()
+
+            # There were very weird individual reports of `bbox_original` starting in (0, 0) while the `bbox_blurred`
+            # derived from it was fine. Commit 31da54b should solve it, keep the safety check just in case.
+            if bbox_blurred[0] > bbox_original[0] or bbox_blurred[1] > bbox_original[1] \
+                    or bbox_blurred[2] < bbox_original[2] or bbox_blurred[3] < bbox_original[3]:
+                gr.Error(dedent("""\
+                    Fatal error: blurred mask is smaller than the original one.
+                    Inpaint Mask Tools will not work this time. Please report this issue and
+                    attach the mask and generation parameters."""))
+                logger.error(dedent("""\
+                    Fatal error: blurred mask is smaller than the original one.
+                    Please report this issue and attach the mask and generation parameters."""))
+                logger.error(f"bbox_original: {bbox_original}; bbox_blurred: {bbox_blurred}")
+                return p
+
             # Width and height added by gaussian blur (in pixels)
             blurW = (bbox_original[0] - bbox_blurred[0]) + (bbox_blurred[2] - bbox_original[2])  # (left) + (right)
             blurH = (bbox_original[1] - bbox_blurred[1]) + (bbox_blurred[3] - bbox_original[3])  # (top) + (bottom)
