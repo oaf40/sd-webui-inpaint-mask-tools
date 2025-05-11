@@ -10,8 +10,8 @@ function imt_isInInpaintMode() {
 	);
 
 	return (
-		uiActiveTab?.textContent.trim() === "img2img" &&
-		uiActiveImg2ImgTab?.textContent.trim() === "Inpaint"
+		uiActiveTab?.textContent.trim().toLowerCase() === "img2img" &&
+		uiActiveImg2ImgTab?.textContent.trim().toLowerCase() === "inpaint"
 	);
 }
 
@@ -22,7 +22,7 @@ function imt_onImg2ImgTabChanged(mutationsList, observer) {
 			mut.target.tagName.toLowerCase() === "button"
 		) {
 			const uiQuickControls = gradioApp().querySelectorAll(
-				".imt_quickcontrols button",
+				"div.imt_quickcontrols button"
 			);
 			const inpaintModeActive = imt_isInInpaintMode();
 			for (const uiButton of uiQuickControls)
