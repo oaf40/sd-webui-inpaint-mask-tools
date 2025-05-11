@@ -346,7 +346,7 @@ class MaskDimensionsScript(scripts.Script):
         upscale to target resolution if it's too small.
         :param p: img2img job data
         """
-        original_mask: Image = p.image_mask
+        original_mask: Image = p.image_mask.convert("L")
         original_width: int = p.width
         original_height: int = p.height
         log_line: str = f"Requested {original_width}x{original_height}"
