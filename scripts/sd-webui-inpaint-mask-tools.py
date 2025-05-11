@@ -21,6 +21,7 @@ SCRIPT_NAME = "Inpaint Mask Tools"
 MEGA = 1000 * 1000
 MULTIPLY_FACTOR = 1.1
 WHOLEPICTURE_SAFEGUARD_TOLERANCE = 0.03  # 3%
+GRADIO_V4 = gr.__version__.startswith("4")
 
 
 class CalcMode(Enum):
@@ -136,12 +137,14 @@ class MaskDimensionsScript(scripts.Script):
                     show_progress=False,
                 )
 
-            set_on_click_listener(
-                calc_blur_pad_round, self.imt_on_calc_blur_pad_round
-            )
-            set_on_click_listener(calc_raw_round, self.imt_on_calc_raw_round)
-            set_on_click_listener(calc_multiply, self.imt_on_calc_multiply)
-            set_on_click_listener(calc_raw, self.imt_on_calc_raw)
+            # The developers have made it impossible to access the mask anymore
+            if not GRADIO_V4:
+                set_on_click_listener(
+                    calc_blur_pad_round, self.imt_on_calc_blur_pad_round
+                )
+                set_on_click_listener(calc_raw_round, self.imt_on_calc_raw_round)
+                set_on_click_listener(calc_multiply, self.imt_on_calc_multiply)
+                set_on_click_listener(calc_raw, self.imt_on_calc_raw)
 
         return None
 
