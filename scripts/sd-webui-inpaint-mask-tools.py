@@ -17,11 +17,15 @@ from modules.processing import create_binary_mask, StableDiffusionProcessingImg2
 from modules.script_callbacks import on_ui_settings
 from modules.ui_components import ToolButton
 
+from scripts.compat.gradio import GRADIO_V4, get_canvas_uuid, canvas_to_image
+
+if GRADIO_V4:
+    from modules_forge.forge_canvas.canvas import LogicalImage
+
 SCRIPT_NAME = "Inpaint Mask Tools"
 MEGA = 1000 * 1000
 MULTIPLY_FACTOR = 1.1
 WHOLEPICTURE_SAFEGUARD_TOLERANCE = 0.03  # 3%
-GRADIO_V4 = gr.__version__.startswith("4")
 
 
 class CalcMode(Enum):
@@ -57,14 +61,19 @@ def measure_bbox(bbox: tuple[int, int, int, int]) -> tuple[int, int, float]:
 
 
 class MaskDimensionsScript(scripts.Script):
-    ui_components = {
-        "img2maskimg": None,
-        "img2img_width": None,
-        "img2img_height": None,
-        "img2img_mask_blur": None,
-        "img2img_inpaint_full_res_padding": None,
-        "img2img_mask_mode": None,
-    }
+    def __init__(self):
+        self.ui_components = {
+            "img2maskimg": None,
+            "img2img_width": None,
+            "img2img_height": None,
+            "img2img_mask_blur": None,
+            "img2img_inpaint_full_res_padding": None,
+            "img2img_mask_mode": None,
+        }
+
+        if GRADIO_V4:
+            self.forge_canvas_uuid: str = None
+            self.forge_canvas_foreground: LogicalImage = None
 
     def title(self) -> str:
         return SCRIPT_NAME
@@ -79,6 +88,17 @@ class MaskDimensionsScript(scripts.Script):
         for ui_cid in self.ui_components:
             if kwargs.get("elem_id") == ui_cid:
                 self.ui_components[ui_cid] = component
+
+                # Extract the UUID of the container to match with the LogicalImage instances later
+                if GRADIO_V4 and ui_cid == "img2maskimg":
+                    self.forge_canvas_uuid = get_canvas_uuid(kwargs)
+
+        if GRADIO_V4 \
+                and self.forge_canvas_uuid \
+                and not self.forge_canvas_foreground \
+                and kwargs.get("elem_id", "") == f"uuid_{self.forge_canvas_uuid}" \
+                and "logical_image_foreground" in kwargs.get("elem_classes", []):
+            self.forge_canvas_foreground = component
 
     def ui(self, is_img2img: bool):
         if not is_img2img:
@@ -125,6 +145,8 @@ class MaskDimensionsScript(scripts.Script):
                     "img2img_height",
                 ]
             ]
+            if GRADIO_V4:
+                button_inputs[0] = self.forge_canvas_foreground
             button_outputs = [
                 self.ui_components[x] for x in ["img2img_width", "img2img_height"]
             ]
@@ -137,14 +159,12 @@ class MaskDimensionsScript(scripts.Script):
                     show_progress=False,
                 )
 
-            # The developers have made it impossible to access the mask anymore
-            if not GRADIO_V4:
-                set_on_click_listener(
-                    calc_blur_pad_round, self.imt_on_calc_blur_pad_round
-                )
-                set_on_click_listener(calc_raw_round, self.imt_on_calc_raw_round)
-                set_on_click_listener(calc_multiply, self.imt_on_calc_multiply)
-                set_on_click_listener(calc_raw, self.imt_on_calc_raw)
+            set_on_click_listener(
+                calc_blur_pad_round, self.imt_on_calc_blur_pad_round
+            )
+            set_on_click_listener(calc_raw_round, self.imt_on_calc_raw_round)
+            set_on_click_listener(calc_multiply, self.imt_on_calc_multiply)
+            set_on_click_listener(calc_raw, self.imt_on_calc_raw)
 
         return None
 
@@ -161,11 +181,11 @@ class MaskDimensionsScript(scripts.Script):
             p = self.imt_process_multipleof8_safeguard(p)
         return p
 
-    def imt_on_calc_raw(self, canvas: dict, blur: int, padding: int, inv: int, fallback_width: int,
+    def imt_on_calc_raw(self, canvas, blur: int, padding: int, inv: int, fallback_width: int,
                         fallback_height: int) -> tuple[int, int]:
         """
         Calculate the width and height of the bounding box surrounding the masked area
-        :param canvas: ["image", "mask"]
+        :param canvas: wrapped mask image
         :param blur: not used
         :param padding: not used
         :param inv: not used
@@ -173,15 +193,15 @@ class MaskDimensionsScript(scripts.Script):
         :param fallback_height: fallback value if mask doesn't exist
         :return: width and height in pixels
         """
-        mask = canvas.get("mask") if canvas else None
+        mask: Image = canvas_to_image(canvas)
         return self.imt_calculate_bbox(CalcMode.RAW, mask, blur, padding, inv, fallback_width, fallback_height)
 
-    def imt_on_calc_raw_round(self, canvas: dict, blur: int, padding: int, inv: int, fallback_width: int,
+    def imt_on_calc_raw_round(self, canvas, blur: int, padding: int, inv: int, fallback_width: int,
                               fallback_height: int) -> tuple[int, int]:
         """
         Calculate the width and height of the bounding box surrounding the masked area,
         round up the dimensions to the nearest multiple of 8.
-        :param canvas: ["image", "mask"]
+        :param canvas: wrapped mask image
         :param blur: not used
         :param padding: not used
         :param inv: not used
@@ -189,15 +209,15 @@ class MaskDimensionsScript(scripts.Script):
         :param fallback_height: fallback value if mask doesn't exist
         :return: width and height in pixels
         """
-        mask = canvas.get("mask") if canvas else None
+        mask: Image = canvas_to_image(canvas)
         return self.imt_calculate_bbox(CalcMode.RAW_ROUND, mask, blur, padding, inv, fallback_width, fallback_height)
 
-    def imt_on_calc_blur_pad_round(self, canvas: dict, blur: int, padding: int, inv: int, fallback_width: int,
+    def imt_on_calc_blur_pad_round(self, canvas, blur: int, padding: int, inv: int, fallback_width: int,
                                    fallback_height: int) -> tuple[int, int]:
         """
         Calculate the width and height of the bounding box surrounding the masked area while
         accounting for blur and padding, round up the dimensions to the nearest multiple of 8.
-        :param canvas: ["image", "mask"]
+        :param canvas: wrapped mask image
         :param blur: blur factor
         :param padding: pad N pixels on each side
         :param inv: mask inversion flag
@@ -205,12 +225,12 @@ class MaskDimensionsScript(scripts.Script):
         :param fallback_height: fallback value if mask doesn't exist
         :return: width and height in pixels
         """
-        mask = canvas.get("mask") if canvas else None
+        mask: Image = canvas_to_image(canvas)
         return self.imt_calculate_bbox(CalcMode.BLUR_PAD_ROUND, mask, blur, padding, inv, fallback_width,
                                        fallback_height)
 
     def imt_on_calc_multiply(
-            self, canvas: dict, blur: int, padding: int, inv: int, width: int, height: int
+            self, canvas, blur: int, padding: int, inv: int, width: int, height: int
     ) -> tuple[int, int]:
         """
         Multiply width and height by MULTIPLY_FACTOR and round up each value to the nearest multiple of 8.

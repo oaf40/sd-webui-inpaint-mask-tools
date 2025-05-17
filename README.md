@@ -161,9 +161,6 @@ This project is licensed under GPL v3, except for a small piece of code borrowed
 This project uses [ruff](https://github.com/astral-sh/ruff) and [biome](https://github.com/biomejs/biome) for enforcing the consistent code style for Python and Javascript, respectively.
 
 ## Compatibility
-This extension works fully only with UIs based on Gradio v3 such as vanilla A1111, Forge and reForge that are on v3 branches.
+This extension supports UIs based on Gradio v3 (A1111, old Forge, reForge) and v4 (modern Forge, reForge on v4 branch).
 
-**Gradio v4 is partially unsupported** until someone finds a way to obtain a working pointer to `init_img_with_mask.foreground` from inside the code of extension.
-Without access to mask pixels the quick controls will not work. Forge and reForge UIs based on Gradio v4 use the custom ForgeCanvas widget that isolates the background (an image) and foreground (a mask) from us. Automatic features should work regardless.
-
-Additionally, UI notifications in the top right corner might not work in Forge and reForge.
+UI notifications in the top right corner might not work in Forge and reForge.
