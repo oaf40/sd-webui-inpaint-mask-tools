@@ -15,6 +15,7 @@ Managing the correct aspect ratio and target resolution for inpainting masks is 
 * ✅ Auto-round width & height to ×32†
 
 (changes will take into effect immediately)
+
 † *the setting name says 8 because it was the old default behaviour, the name was kept intact for backwards compatibility with existing installations*
 
 ## Table of Contents
@@ -59,7 +60,7 @@ This is a common mistake that can occur due to an accidental typo. If the width 
 
 ![Multiple of 32 glitch example](images/004-multiple-of-32-glitch.png)
 
-On frontends that allow specifying a multiplier, this value will be used instead of 32. **Ensure the value you have set equals 32 or is greater to avoid the "white (foggy) borders" issue when inpainting the edges of an image**.
+On frontends that allow specifying a Resolution Step (i.e. reForge Neo), this value will be used instead of 32. **Ensure the value you have set is ≥32 to avoid the "white (foggy) borders" issue when inpainting the edges of an image**.
 
 ### Quicksettings List integration
 Allows you to adjust the necessary options in a convenient way. Changes come into effect the next time the "Generate" button is clicked. Type `imt_` into the Quicksettings search bar to locate the 4 available options.

@@ -76,6 +76,19 @@ class MaskDimensionsScript(scripts.Script):
             self.forge_canvas_uuid: str = None
             self.forge_canvas_foreground: LogicalImage = None
 
+        # Some UIs (i.e. reForge Neo) allow setting custom dimensions multiplier,
+        # let's sync with that value if this setting exists but yield a warning
+        # if the value is lower than 32.
+        global ROUND_FACTOR
+        if shared.opts.get_default("res_step"):  # check if key exists at all
+            logger.info("Resolution Step setting found, synchronizing ROUND_FACTOR value")
+            if shared.opts.res_step:  # potentially could be 0
+                ROUND_FACTOR = shared.opts.res_step
+            else:
+                logger.warning(f"Refusing to use invalid value, defaulting to {ROUND_FACTOR}")
+        else:
+            logger.info(f"Resolution Step setting doesn't exist in this UI, defaulting to {ROUND_FACTOR}")
+
     def title(self) -> str:
         return SCRIPT_NAME
 
@@ -173,6 +186,17 @@ class MaskDimensionsScript(scripts.Script):
     def process(self, p: StableDiffusionProcessingImg2Img) -> StableDiffusionProcessingImg2Img:
         if not p.image_mask:  # we need a mask to work
             return
+
+        # Check ROUND_FACTOR validity here every run instead of hooking
+        # `round_by_factor` to avoid duplicate notifications in case
+        # when the value is bad.
+        if ROUND_FACTOR < 32:
+            msg = dedent(f"""\
+                Resolution Step value of {ROUND_FACTOR} might cause the white borders
+                issue. Go to "Settings -> System" and adjust the Resolution Step value.""")
+            gr.Warning(msg)
+            logger.warning(msg)
+            # Don't interrupt the generation here, let it run regardless.
 
         if shared.opts.imt_wholepicture_safeguard:
             p = self.imt_process_wholepicture_safeguard(p)
@@ -356,8 +380,9 @@ class MaskDimensionsScript(scripts.Script):
             0,
         )
         if (force or not p.inpaint_full_res) and not tolerance_ok:
-            msg = """Detected unusual dimensions set for the \"Whole
-                picture\" mode. Did you mean to use \"Only masked\" instead?"""
+            msg = dedent("""\
+                Detected unusual dimensions set for the \"Whole
+                picture\" mode. Did you mean to use \"Only masked\" instead?""")
             shared.state.interrupt()
             gr.Warning(msg)
         return p
