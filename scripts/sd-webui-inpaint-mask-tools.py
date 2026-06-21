@@ -24,6 +24,7 @@ if GRADIO_V4:
 
 SCRIPT_NAME = "Inpaint Mask Tools"
 MEGA = 1000 * 1000
+ROUND_FACTOR = 8
 MULTIPLY_FACTOR = 1.1
 WHOLEPICTURE_SAFEGUARD_TOLERANCE = 0.03  # 3%
 
@@ -39,13 +40,13 @@ logger = logging.getLogger(f"[{SCRIPT_NAME}]")
 logger.setLevel(logging.INFO)
 
 
-def round_by_8(val: float) -> int:
+def round_by_factor(val: float) -> int:
     """
-    Round up the value to the nearest multiple of 8
+    Round up the value to the nearest multiple of ROUND_FACTOR
     :param val: source value
     :return: rounded value
     """
-    return int(ceil((val if val > 0 else 1) / 8) * 8)
+    return int(ceil((val if val > 0 else 1) / ROUND_FACTOR) * ROUND_FACTOR)
 
 
 def measure_bbox(bbox: tuple[int, int, int, int]) -> tuple[int, int, float]:
@@ -113,18 +114,18 @@ class MaskDimensionsScript(scripts.Script):
                 calc_blur_pad_round = ToolButton(
                     value="🎭<sup>BP</sup>",
                     elem_id="img2img_imt_calc_blur_pad_round",
-                    tooltip="Calculate mask dimensions accounting for blur and padding, round to the multiple of 8",
+                    tooltip=f"Calculate mask dimensions accounting for blur and padding, round to the multiple of {ROUND_FACTOR}",
                 )
                 calc_raw_round = ToolButton(
                     value="🎭",
                     elem_id="img2img_imt_calc_round",
-                    tooltip="Calculate mask dimensions, round to the multiple of 8 (do not account for blur and padding)",
+                    tooltip=f"Calculate mask dimensions, round to the multiple of {ROUND_FACTOR} (do not account for blur and padding)",
                 )
             with gr.Column(scale=1, elem_classes="imt_quickcontrols dimensions-tools"):
                 calc_multiply = ToolButton(
                     value=f"x{MULTIPLY_FACTOR}",
                     elem_id="img2img_imt_calc_multiply",
-                    tooltip=f"Multiply the current width and height by {MULTIPLY_FACTOR}, round to the multiple of 8",
+                    tooltip=f"Multiply the current width and height by {MULTIPLY_FACTOR}, round to the multiple of {ROUND_FACTOR}",
                 )
                 calc_raw = ToolButton(
                     value="🎭<sup>RAW</sup>",
@@ -200,7 +201,7 @@ class MaskDimensionsScript(scripts.Script):
                               fallback_height: int) -> tuple[int, int]:
         """
         Calculate the width and height of the bounding box surrounding the masked area,
-        round up the dimensions to the nearest multiple of 8.
+        round up the dimensions to the nearest multiple of ROUND_FACTOR.
         :param canvas: wrapped mask image
         :param blur: not used
         :param padding: not used
@@ -216,7 +217,7 @@ class MaskDimensionsScript(scripts.Script):
                                    fallback_height: int) -> tuple[int, int]:
         """
         Calculate the width and height of the bounding box surrounding the masked area while
-        accounting for blur and padding, round up the dimensions to the nearest multiple of 8.
+        accounting for blur and padding, round up the dimensions to the nearest multiple of ROUND_FACTOR.
         :param canvas: wrapped mask image
         :param blur: blur factor
         :param padding: pad N pixels on each side
@@ -233,7 +234,7 @@ class MaskDimensionsScript(scripts.Script):
             self, canvas, blur: int, padding: int, inv: int, width: int, height: int
     ) -> tuple[int, int]:
         """
-        Multiply width and height by MULTIPLY_FACTOR and round up each value to the nearest multiple of 8.
+        Multiply width and height by MULTIPLY_FACTOR and round up each value to the nearest multiple of ROUND_FACTOR.
         :param canvas: not used
         :param blur: not used
         :param padding: not used
@@ -242,7 +243,7 @@ class MaskDimensionsScript(scripts.Script):
         :param height: value to multiply
         :return: width and height in pixels
         """
-        return round_by_8(width * MULTIPLY_FACTOR), round_by_8(height * MULTIPLY_FACTOR)
+        return round_by_factor(width * MULTIPLY_FACTOR), round_by_factor(height * MULTIPLY_FACTOR)
 
     def imt_calculate_bbox(
             self,
@@ -257,7 +258,7 @@ class MaskDimensionsScript(scripts.Script):
         """
         Common function for calculating the bounding box around the masked area.
         Account for blur and padding if requested.
-        Round up the values to the nearest multiple of 8 if requested.
+        Round up the values to the nearest multiple of ROUND_FACTOR if requested.
         :param calc_mode: calculation mode
         :param mask: mask
         :param blur: blur factor
@@ -289,7 +290,7 @@ class MaskDimensionsScript(scripts.Script):
         if calc_mode == CalcMode.RAW:
             return imt_width, imt_height
         elif calc_mode == CalcMode.RAW_ROUND:
-            return round_by_8(imt_width), round_by_8(imt_height)
+            return round_by_factor(imt_width), round_by_factor(imt_height)
 
         # Calculate accounting for blur and padding
         imt_mask = self.imt_apply_blur(imt_mask, blur, blur)  # same blur factor for X and Y axes
@@ -301,7 +302,7 @@ class MaskDimensionsScript(scripts.Script):
 
         imt_width, imt_height, imt_resolution = measure_bbox(bbox)
         if calc_mode == CalcMode.BLUR_PAD_ROUND:
-            return round_by_8(imt_width), round_by_8(imt_height)
+            return round_by_factor(imt_width), round_by_factor(imt_height)
         elif calc_mode == CalcMode.INTERNAL:
             return imt_aspect_ratio, imt_width, imt_height, imt_resolution, get_crop_region_v2(imt_mask, 0)
         else:
@@ -442,9 +443,9 @@ class MaskDimensionsScript(scripts.Script):
             imt_height = int(imt_height) + blurH + padH
             log_line += f", upscaled {imt_width}x{imt_height}"
 
-        if imt_width % 8 or imt_height % 8:
-            imt_width = round_by_8(imt_width)
-            imt_height = round_by_8(imt_height)
+        if imt_width % ROUND_FACTOR or imt_height % ROUND_FACTOR:
+            imt_width = round_by_factor(imt_width)
+            imt_height = round_by_factor(imt_height)
             log_line += f", rounded {imt_width}x{imt_height} ({round(imt_width * imt_height / MEGA, 2)} Mp)"
 
         logger.info(log_line)
@@ -456,15 +457,15 @@ class MaskDimensionsScript(scripts.Script):
     def imt_process_multipleof8_safeguard(self,
                                           p: StableDiffusionProcessingImg2Img) -> StableDiffusionProcessingImg2Img:
         """
-        Automatically round up width and height to the nearest multiple of 8
+        Automatically round up width and height to the nearest multiple of ROUND_FACTOR
         :param p: img2img job data
         """
         old_width = p.width
         old_height = p.height
-        if old_width % 8:
-            p.width = round_by_8(old_width)
-        if old_height % 8:
-            p.height = round_by_8(old_height)
+        if old_width % ROUND_FACTOR:
+            p.width = round_by_factor(old_width)
+        if old_height % ROUND_FACTOR:
+            p.height = round_by_factor(old_height)
         if p.width != old_width or p.height != old_height:
             log_line = (
                 f"Adjusted size from {old_width}x{old_height} to {p.width}x{p.height}"
@@ -500,10 +501,10 @@ def imt_init_settings():
             {"minimum": 0, "maximum": 4, "step": 0.1},
             section=section,
         ).info(
-            dedent("""\
+            dedent(f"""\
                 Upscale the width and height if the masked area's resolution 
                 is below the specified value. The upscaled values are rounded up to the 
-                nearest multiple of 8, causing minimal impact on the original aspect 
+                nearest multiple of {ROUND_FACTOR}, causing minimal impact on the original aspect 
                 ratio. Set to 0 to disable this option. <b>Recommended values: 1–1.5</b>.""")  # noqa: W291
         ),
     )
@@ -521,7 +522,7 @@ def imt_init_settings():
     shared.opts.add_option(
         "imt_multipleof8_safeguard",
         shared.OptionInfo(
-            True, "Auto-round width & height to ×8", gr.Checkbox, section=section
+            True, f"Auto-round width & height to ×{ROUND_FACTOR}", gr.Checkbox, section=section
         ).info(
             dedent("""\
                 Prevent nasty visual glitches on the edges of inpainted 
