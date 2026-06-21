@@ -385,6 +385,7 @@ class MaskDimensionsScript(scripts.Script):
                 picture\" mode. Did you mean to use \"Only masked\" instead?""")
             shared.state.interrupt()
             gr.Warning(msg)
+            logger.warning(msg)
         return p
 
     def imt_process_autoadjust_onlymasked(self,
