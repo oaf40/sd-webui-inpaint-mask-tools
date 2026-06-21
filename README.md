@@ -12,9 +12,10 @@ Managing the correct aspect ratio and target resolution for inpainting masks is 
 * ✅ Autoadjust Width and Height in "Only masked" mode
 * Upscale small areas to resolution (Mpx): **1.0**
 * ✅ "Whole picture" inpainting safeguard
-* ✅ Auto-round width & height to ×8
+* ✅ Auto-round width & height to ×32†
 
 (changes will take into effect immediately)
+† *the setting name says 8 because it was the old default behaviour, the name was kept intact for backwards compatibility with existing installations*
 
 ## Table of Contents
 1. [Features](#features)
@@ -53,10 +54,12 @@ The calculations are useful for estimating the capabilities of your model/GPU be
 Prevents wasting time on generating unintentionally shrunk images. This feature detects unusual dimensions in Whole Picture mode and immediately halts generation. A slight variation in resolution is permitted, as minor shrinking or expansion by a few pixels is often intentional.
 ![Whole Picture inpainting safeguard](images/003-whole-picture-inpainting-safeguard.jpg)
 
-### Auto-rounding width and height to multiple of 8
-This is a common mistake that can occur due to an accidental typo. If the width or height are not multiples of 8, the resulting image will have visual glitches on the edges of inpainted areas. Example:
+### Auto-rounding width and height to multiple of 32
+This is a common mistake that can occur due to an accidental typo. If the width or height are not multiples of 32, the resulting image will have visual glitches on the edges of inpainted areas. Example:
 
-![Multiple of 8 glitch example](images/004-multiple-of-8-glitch.png)
+![Multiple of 32 glitch example](images/004-multiple-of-32-glitch.png)
+
+On frontends that allow specifying a multiplier, this value will be used instead of 32. **Ensure the value you have set equals 32 or is greater to avoid the "white (foggy) borders" issue when inpainting the edges of an image**.
 
 ### Quicksettings List integration
 Allows you to adjust the necessary options in a convenient way. Changes come into effect the next time the "Generate" button is clicked. Type `imt_` into the Quicksettings search bar to locate the 4 available options.
@@ -84,7 +87,7 @@ The following img2img parameters are set:
 * Resize mode: Just resize
 * Mask blur: 32 (default: 4)
 * Inpaint area: Only masked (default: Whole picture)
-* Only masked padding, pixels: 32
+* Only masked padding, pixels: 32 (**pro-tip: when using the "expansion dots" technique, set this setting to some low value (0 to 8), you never need big padding in this case**)
 * Sampling method / Schedule type: Euler A / Automatic
 * Denoising strength: 0.4
 * Width / Height: **1024x1024**
@@ -137,7 +140,8 @@ Now, let's reuse the same seed and all other generation parameters - but this ti
 ```crop_region=(1030, 487, 2828, 1511)
 expand_crop_region=(1029, 487, 2829, 1511), expanded size 1800x1024
 ```
-AI model input dimensions: 1800x1024 (originally masked 1792x1024, automatically rounded to the nearest multiple of 8)
+AI model input dimensions: 1800x1024 (originally masked 1792x1024, automatically rounded to the nearest multiple of 8†)
+† **32 since commit 1e58117f**, the value has been bumped to address the white borders issue.
 ![High-res inpaint input](images/parakeet-example/011-model-input.jpg)
 AI model output dimensions: 1800x1024, then downscaled back to 1792x1024 and injected into the original image according to the mask. Let's zoom in!
 ![The parakeet's wind inpainted at 1800x1024](images/parakeet-example/012-output-close-up.jpg)
