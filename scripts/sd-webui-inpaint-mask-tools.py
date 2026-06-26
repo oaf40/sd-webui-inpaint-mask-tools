@@ -40,6 +40,16 @@ logger = logging.getLogger(f"[{SCRIPT_NAME}]")
 logger.setLevel(logging.INFO)
 
 
+def tidy_str(string: str) -> int:
+    """
+    Return the `dedent`'ed string but with newlines replaced with just spaces.
+    Helps with triple-quoted strings.
+    :param string: string to tidy
+    :return tidied single-line string
+    """
+    return dedent(string).replace("\n", " ")
+
+
 def round_by_factor(val: float) -> int:
     """
     Round up the value to the nearest multiple of ROUND_FACTOR
@@ -191,7 +201,7 @@ class MaskDimensionsScript(scripts.Script):
         # `round_by_factor` to avoid duplicate notifications in case
         # when the value is bad.
         if ROUND_FACTOR < 32:
-            msg = dedent(f"""\
+            msg = tidy_str(f"""\
                 Resolution Step value of {ROUND_FACTOR} might cause the white borders
                 issue. Go to "Settings -> System" and adjust the Resolution Step value.""")
             show_notification("warning", msg)
@@ -394,7 +404,7 @@ class MaskDimensionsScript(scripts.Script):
             0,
         )
         if (force or not p.inpaint_full_res) and not tolerance_ok:
-            msg = dedent("""\
+            msg = tidy_str("""\
                 Detected unusual dimensions set for the \"Whole
                 picture\" mode. Did you mean to use \"Only masked\" instead?""")
             shared.state.interrupt()
@@ -456,7 +466,7 @@ class MaskDimensionsScript(scripts.Script):
                 or bbox_blurred[2] < bbox_original[2]
                 or bbox_blurred[3] < bbox_original[3]
             ):
-                msg = dedent("""\
+                msg = tidy_str("""\
                     Fatal error: blurred mask is smaller than the original one.
                     Inpaint Mask Tools will not work this time. Please report this issue and
                     attach the mask and generation parameters.""")
@@ -544,10 +554,10 @@ def imt_init_settings():
             gr.Checkbox,
             section=section,
         ).info(
-            dedent("""\
-                Automatically override specified width and height when you click 
-                "Generate". Provides faster UX but less flexible: doesn't work 
-                well when the masked area is under 1 Mpx. <b>Check out the 
+            tidy_str("""\
+                Automatically override specified width and height when you click
+                "Generate". Provides faster UX but less flexible: doesn't work
+                well when the masked area is under 1 Mpx. <b>Check out the
                 "Upscale" setting for better results!</b>""")  # noqa: W291
         ),
     )
@@ -560,10 +570,10 @@ def imt_init_settings():
             {"minimum": 0, "maximum": 4, "step": 0.1},
             section=section,
         ).info(
-            dedent(f"""\
-                Upscale the width and height if the masked area's resolution 
-                is below the specified value. The upscaled values are rounded up to the 
-                nearest multiple of {ROUND_FACTOR}, causing minimal impact on the original aspect 
+            tidy_str(f"""\
+                Upscale the width and height if the masked area's resolution
+                is below the specified value. The upscaled values are rounded up to the
+                nearest multiple of {ROUND_FACTOR}, causing minimal impact on the original aspect
                 ratio. Set to 0 to disable this option. <b>Recommended values: 1–1.5</b>.""")  # noqa: W291
         ),
     )
@@ -572,9 +582,9 @@ def imt_init_settings():
         shared.OptionInfo(
             True, '"Whole picture" inpainting safeguard', gr.Checkbox, section=section
         ).info(
-            dedent("""\
-                Prevent image generation in "Whole Picture" mode if the 
-                target dimensions exceed 3% of the original size. Helps avoid wasted 
+            tidy_str("""\
+                Prevent image generation in "Whole Picture" mode if the
+                target dimensions exceed 3% of the original size. Helps avoid wasted
                 time on shrunken images when "Only Masked" mode is not selected.""")  # noqa: W291
         ),
     )
@@ -583,8 +593,8 @@ def imt_init_settings():
         shared.OptionInfo(
             True, f"Auto-round width & height to ×{ROUND_FACTOR}", gr.Checkbox, section=section
         ).info(
-            dedent("""\
-                Prevent nasty visual glitches on the edges of inpainted 
+            tidy_str("""\
+                Prevent nasty visual glitches on the edges of inpainted
                 areas. Keeping this option enabled is recommended.""")  # noqa: W291
         ),
     )
