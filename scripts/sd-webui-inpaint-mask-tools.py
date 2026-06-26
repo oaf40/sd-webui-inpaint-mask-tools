@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-# SPDX-FileCopyrightText: 2025 oaf40
+# SPDX-FileCopyrightText: 2025-2026 oaf40
 
 import logging
 from enum import auto, Enum
@@ -17,7 +17,7 @@ from modules.processing import create_binary_mask, StableDiffusionProcessingImg2
 from modules.script_callbacks import on_ui_settings
 from modules.ui_components import ToolButton
 
-from scripts.compat.gradio import GRADIO_V4, get_canvas_uuid, canvas_to_image
+from scripts.compat.gradio import GRADIO_V4, canvas_to_image, get_canvas_uuid, show_notification
 
 if GRADIO_V4:
     from modules_forge.forge_canvas.canvas import LogicalImage
@@ -194,7 +194,7 @@ class MaskDimensionsScript(scripts.Script):
             msg = dedent(f"""\
                 Resolution Step value of {ROUND_FACTOR} might cause the white borders
                 issue. Go to "Settings -> System" and adjust the Resolution Step value.""")
-            gr.Warning(msg)
+            show_notification("warning", msg)
             logger.warning(msg)
             # Don't interrupt the generation here, let it run regardless.
 
@@ -300,7 +300,7 @@ class MaskDimensionsScript(scripts.Script):
             if not (mask and get_crop_region_v2(mask)):
                 raise RuntimeError()
         except:  # noqa: E722
-            gr.Error("Cannot access the mask")
+            show_notification("error", "Cannot access the mask")
             logger.error("Cannot access the mask")
             return fallback_width, fallback_height
 
@@ -384,7 +384,7 @@ class MaskDimensionsScript(scripts.Script):
                 Detected unusual dimensions set for the \"Whole
                 picture\" mode. Did you mean to use \"Only masked\" instead?""")
             shared.state.interrupt()
-            gr.Warning(msg)
+            show_notification("warning", msg)
             logger.warning(msg)
         return p
 
@@ -432,13 +432,12 @@ class MaskDimensionsScript(scripts.Script):
             # derived from it was fine. Commit 31da54b should solve it, keep the safety check just in case.
             if bbox_blurred[0] > bbox_original[0] or bbox_blurred[1] > bbox_original[1] \
                     or bbox_blurred[2] < bbox_original[2] or bbox_blurred[3] < bbox_original[3]:
-                gr.Error(dedent("""\
+                msg = dedent("""\
                     Fatal error: blurred mask is smaller than the original one.
                     Inpaint Mask Tools will not work this time. Please report this issue and
-                    attach the mask and generation parameters."""))
-                logger.error(dedent("""\
-                    Fatal error: blurred mask is smaller than the original one.
-                    Please report this issue and attach the mask and generation parameters."""))
+                    attach the mask and generation parameters.""")
+                show_notification("error", msg)
+                logger.error(msg)
                 logger.error(f"bbox_original: {bbox_original}; bbox_blurred: {bbox_blurred}")
                 return p
 
@@ -475,7 +474,7 @@ class MaskDimensionsScript(scripts.Script):
             log_line += f", rounded {imt_width}x{imt_height} ({round(imt_width * imt_height / MEGA, 2)} Mp)"
 
         logger.info(log_line)
-        gr.Info(f"Adjusted dimensions from {original_width}x{original_height} to {imt_width}x{imt_height}")
+        show_notification("info", f"Adjusted dimensions from {original_width}x{original_height} to {imt_width}x{imt_height}")
         p.width = imt_width
         p.height = imt_height
         return p
@@ -493,11 +492,11 @@ class MaskDimensionsScript(scripts.Script):
         if old_height % ROUND_FACTOR:
             p.height = round_by_factor(old_height)
         if p.width != old_width or p.height != old_height:
-            log_line = (
-                f"Adjusted size from {old_width}x{old_height} to {p.width}x{p.height}"
+            msg = (
+                f"Adjusted dimensions from {old_width}x{old_height} to {p.width}x{p.height}"
             )
-            logger.info(log_line)
-            gr.Info(log_line)
+            show_notification("info", msg)
+            logger.info(msg)
         return p
 
 
