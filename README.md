@@ -167,5 +167,3 @@ This project uses [ruff](https://github.com/astral-sh/ruff) and [biome](https://
 
 ## Compatibility
 This extension supports UIs based on Gradio v3 (A1111, old Forge, reForge) and v4 (modern Forge, reForge on v4 branch).
-
-UI notifications in the top right corner might not work in Forge and reForge.
