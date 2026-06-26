@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2025-2026 oaf40
 
 import logging
-from enum import auto, Enum
+from enum import Enum, auto
 from math import ceil, sqrt
 from textwrap import dedent
 
@@ -10,12 +10,12 @@ import cv2
 import gradio as gr
 import modules.scripts as scripts
 import numpy as np
-from PIL import Image, ImageOps
 from modules import shared
 from modules.masking import get_crop_region_v2
-from modules.processing import create_binary_mask, StableDiffusionProcessingImg2Img
+from modules.processing import StableDiffusionProcessingImg2Img, create_binary_mask
 from modules.script_callbacks import on_ui_settings
 from modules.ui_components import ToolButton
+from PIL import Image, ImageOps
 
 from scripts.compat.gradio import GRADIO_V4, canvas_to_image, get_canvas_uuid, show_notification
 
@@ -87,7 +87,9 @@ class MaskDimensionsScript(scripts.Script):
             else:
                 logger.warning(f"Refusing to use invalid value, defaulting to {ROUND_FACTOR}")
         else:
-            logger.info(f"Resolution Step setting doesn't exist in this UI, defaulting to {ROUND_FACTOR}")
+            logger.info(
+                f"Resolution Step setting doesn't exist in this UI, defaulting to {ROUND_FACTOR}"
+            )
 
     def title(self) -> str:
         return SCRIPT_NAME
@@ -107,11 +109,13 @@ class MaskDimensionsScript(scripts.Script):
                 if GRADIO_V4 and ui_cid == "img2maskimg":
                     self.forge_canvas_uuid = get_canvas_uuid(kwargs)
 
-        if GRADIO_V4 \
-                and self.forge_canvas_uuid \
-                and not self.forge_canvas_foreground \
-                and kwargs.get("elem_id", "") == f"uuid_{self.forge_canvas_uuid}" \
-                and "logical_image_foreground" in kwargs.get("elem_classes", []):
+        if (
+            GRADIO_V4
+            and self.forge_canvas_uuid
+            and not self.forge_canvas_foreground
+            and kwargs.get("elem_id", "") == f"uuid_{self.forge_canvas_uuid}"
+            and "logical_image_foreground" in kwargs.get("elem_classes", [])
+        ):
             self.forge_canvas_foreground = component
 
     def ui(self, is_img2img: bool):
@@ -161,9 +165,7 @@ class MaskDimensionsScript(scripts.Script):
             ]
             if GRADIO_V4:
                 button_inputs[0] = self.forge_canvas_foreground
-            button_outputs = [
-                self.ui_components[x] for x in ["img2img_width", "img2img_height"]
-            ]
+            button_outputs = [self.ui_components[x] for x in ["img2img_width", "img2img_height"]]
 
             def set_on_click_listener(btn, fn):
                 btn.click(
@@ -173,9 +175,7 @@ class MaskDimensionsScript(scripts.Script):
                     show_progress=False,
                 )
 
-            set_on_click_listener(
-                calc_blur_pad_round, self.imt_on_calc_blur_pad_round
-            )
+            set_on_click_listener(calc_blur_pad_round, self.imt_on_calc_blur_pad_round)
             set_on_click_listener(calc_raw_round, self.imt_on_calc_raw_round)
             set_on_click_listener(calc_multiply, self.imt_on_calc_multiply)
             set_on_click_listener(calc_raw, self.imt_on_calc_raw)
@@ -206,8 +206,9 @@ class MaskDimensionsScript(scripts.Script):
             p = self.imt_process_multipleof8_safeguard(p)
         return p
 
-    def imt_on_calc_raw(self, canvas, blur: int, padding: int, inv: int, fallback_width: int,
-                        fallback_height: int) -> tuple[int, int]:
+    def imt_on_calc_raw(
+        self, canvas, blur: int, padding: int, inv: int, fallback_width: int, fallback_height: int
+    ) -> tuple[int, int]:
         """
         Calculate the width and height of the bounding box surrounding the masked area
         :param canvas: wrapped mask image
@@ -219,10 +220,13 @@ class MaskDimensionsScript(scripts.Script):
         :return: width and height in pixels
         """
         mask: Image = canvas_to_image(canvas)
-        return self.imt_calculate_bbox(CalcMode.RAW, mask, blur, padding, inv, fallback_width, fallback_height)
+        return self.imt_calculate_bbox(
+            CalcMode.RAW, mask, blur, padding, inv, fallback_width, fallback_height
+        )
 
-    def imt_on_calc_raw_round(self, canvas, blur: int, padding: int, inv: int, fallback_width: int,
-                              fallback_height: int) -> tuple[int, int]:
+    def imt_on_calc_raw_round(
+        self, canvas, blur: int, padding: int, inv: int, fallback_width: int, fallback_height: int
+    ) -> tuple[int, int]:
         """
         Calculate the width and height of the bounding box surrounding the masked area,
         round up the dimensions to the nearest multiple of ROUND_FACTOR.
@@ -235,10 +239,13 @@ class MaskDimensionsScript(scripts.Script):
         :return: width and height in pixels
         """
         mask: Image = canvas_to_image(canvas)
-        return self.imt_calculate_bbox(CalcMode.RAW_ROUND, mask, blur, padding, inv, fallback_width, fallback_height)
+        return self.imt_calculate_bbox(
+            CalcMode.RAW_ROUND, mask, blur, padding, inv, fallback_width, fallback_height
+        )
 
-    def imt_on_calc_blur_pad_round(self, canvas, blur: int, padding: int, inv: int, fallback_width: int,
-                                   fallback_height: int) -> tuple[int, int]:
+    def imt_on_calc_blur_pad_round(
+        self, canvas, blur: int, padding: int, inv: int, fallback_width: int, fallback_height: int
+    ) -> tuple[int, int]:
         """
         Calculate the width and height of the bounding box surrounding the masked area while
         accounting for blur and padding, round up the dimensions to the nearest multiple of ROUND_FACTOR.
@@ -251,11 +258,12 @@ class MaskDimensionsScript(scripts.Script):
         :return: width and height in pixels
         """
         mask: Image = canvas_to_image(canvas)
-        return self.imt_calculate_bbox(CalcMode.BLUR_PAD_ROUND, mask, blur, padding, inv, fallback_width,
-                                       fallback_height)
+        return self.imt_calculate_bbox(
+            CalcMode.BLUR_PAD_ROUND, mask, blur, padding, inv, fallback_width, fallback_height
+        )
 
     def imt_on_calc_multiply(
-            self, canvas, blur: int, padding: int, inv: int, width: int, height: int
+        self, canvas, blur: int, padding: int, inv: int, width: int, height: int
     ) -> tuple[int, int]:
         """
         Multiply width and height by MULTIPLY_FACTOR and round up each value to the nearest multiple of ROUND_FACTOR.
@@ -270,14 +278,14 @@ class MaskDimensionsScript(scripts.Script):
         return round_by_factor(width * MULTIPLY_FACTOR), round_by_factor(height * MULTIPLY_FACTOR)
 
     def imt_calculate_bbox(
-            self,
-            calc_mode: CalcMode,
-            mask: Image,
-            blur: int,
-            padding: int,
-            inv: int,
-            fallback_width: int,
-            fallback_height: int
+        self,
+        calc_mode: CalcMode,
+        mask: Image,
+        blur: int,
+        padding: int,
+        inv: int,
+        fallback_width: int,
+        fallback_height: int,
     ) -> tuple[int, int] | tuple[float, int, int, float, tuple]:
         """
         Common function for calculating the bounding box around the masked area.
@@ -328,7 +336,13 @@ class MaskDimensionsScript(scripts.Script):
         if calc_mode == CalcMode.BLUR_PAD_ROUND:
             return round_by_factor(imt_width), round_by_factor(imt_height)
         elif calc_mode == CalcMode.INTERNAL:
-            return imt_aspect_ratio, imt_width, imt_height, imt_resolution, get_crop_region_v2(imt_mask, 0)
+            return (
+                imt_aspect_ratio,
+                imt_width,
+                imt_height,
+                imt_resolution,
+                get_crop_region_v2(imt_mask, 0),
+            )
         else:
             logger.error("Unhandled calc_mode!")
             return fallback_width, fallback_height
@@ -360,9 +374,9 @@ class MaskDimensionsScript(scripts.Script):
 
         return image
 
-    def imt_process_wholepicture_safeguard(self,
-                                           p: StableDiffusionProcessingImg2Img,
-                                           force=False) -> StableDiffusionProcessingImg2Img:
+    def imt_process_wholepicture_safeguard(
+        self, p: StableDiffusionProcessingImg2Img, force=False
+    ) -> StableDiffusionProcessingImg2Img:
         """
         Interrupt generating when user forgets to switch from "Whole picture" to the
         "Masked area" inpainting mode.
@@ -388,8 +402,9 @@ class MaskDimensionsScript(scripts.Script):
             logger.warning(msg)
         return p
 
-    def imt_process_autoadjust_onlymasked(self,
-                                          p: StableDiffusionProcessingImg2Img) -> StableDiffusionProcessingImg2Img:
+    def imt_process_autoadjust_onlymasked(
+        self, p: StableDiffusionProcessingImg2Img
+    ) -> StableDiffusionProcessingImg2Img:
         """
         Measure the bounding box around the blurred and padded masked area,
         update p.width and p.height with measured dimensions,
@@ -406,8 +421,13 @@ class MaskDimensionsScript(scripts.Script):
             return p
 
         values = self.imt_calculate_bbox(
-            CalcMode.INTERNAL, original_mask, p.mask_blur_x, p.inpaint_full_res_padding, p.inpainting_mask_invert, -1,
-            -1
+            CalcMode.INTERNAL,
+            original_mask,
+            p.mask_blur_x,
+            p.inpaint_full_res_padding,
+            p.inpainting_mask_invert,
+            -1,
+            -1,
         )
         if values[0] == -1:
             # Parent function failed for whatever reason, most likely because the
@@ -430,8 +450,12 @@ class MaskDimensionsScript(scripts.Script):
 
             # There were very weird individual reports of `bbox_original` starting in (0, 0) while the `bbox_blurred`
             # derived from it was fine. Commit 31da54b should solve it, keep the safety check just in case.
-            if bbox_blurred[0] > bbox_original[0] or bbox_blurred[1] > bbox_original[1] \
-                    or bbox_blurred[2] < bbox_original[2] or bbox_blurred[3] < bbox_original[3]:
+            if (
+                bbox_blurred[0] > bbox_original[0]
+                or bbox_blurred[1] > bbox_original[1]
+                or bbox_blurred[2] < bbox_original[2]
+                or bbox_blurred[3] < bbox_original[3]
+            ):
                 msg = dedent("""\
                     Fatal error: blurred mask is smaller than the original one.
                     Inpaint Mask Tools will not work this time. Please report this issue and
@@ -441,6 +465,7 @@ class MaskDimensionsScript(scripts.Script):
                 logger.error(f"bbox_original: {bbox_original}; bbox_blurred: {bbox_blurred}")
                 return p
 
+            # fmt: off
             # Width and height added by gaussian blur (in pixels)
             blurW = (bbox_original[0] - bbox_blurred[0]) + (bbox_blurred[2] - bbox_original[2])  # (left) + (right)
             blurH = (bbox_original[1] - bbox_blurred[1]) + (bbox_blurred[3] - bbox_original[3])  # (top) + (bottom)
@@ -453,6 +478,7 @@ class MaskDimensionsScript(scripts.Script):
                    calc_space(original_mask.size[0] - bbox_blurred[2], p.inpaint_full_res_padding)  # (left) + (right)
             padH = calc_space(bbox_blurred[1], p.inpaint_full_res_padding) + \
                    calc_space(original_mask.size[1] - bbox_blurred[3], p.inpaint_full_res_padding)  # (top) + (bottom)
+            # fmt: on
 
             # Calculate new width and height based on the target resolution
             target_resolution = shared.opts.imt_autoadjust_upscaleto * MEGA
@@ -460,9 +486,13 @@ class MaskDimensionsScript(scripts.Script):
             # (padW + blurW + imt_width) * (padH + blurH + imt_height) = target_resolution, where
             # imt_width = imt_aspect_ratio * imt_height
             b = (padW + blurW) + imt_aspect_ratio * (padH + blurH)
-            imt_height = (-b + sqrt(
-                b * b - 4 * imt_aspect_ratio * ((padW + blurW) * (padH + blurH) - target_resolution))) / (
-                                 2 * imt_aspect_ratio)
+            imt_height = (
+                -b
+                + sqrt(
+                    b * b
+                    - 4 * imt_aspect_ratio * ((padW + blurW) * (padH + blurH) - target_resolution)
+                )
+            ) / (2 * imt_aspect_ratio)
 
             imt_width = int(imt_aspect_ratio * imt_height) + blurW + padW
             imt_height = int(imt_height) + blurH + padH
@@ -471,16 +501,22 @@ class MaskDimensionsScript(scripts.Script):
         if imt_width % ROUND_FACTOR or imt_height % ROUND_FACTOR:
             imt_width = round_by_factor(imt_width)
             imt_height = round_by_factor(imt_height)
-            log_line += f", rounded {imt_width}x{imt_height} ({round(imt_width * imt_height / MEGA, 2)} Mp)"
+            log_line += (
+                f", rounded {imt_width}x{imt_height} ({round(imt_width * imt_height / MEGA, 2)} Mp)"
+            )
 
         logger.info(log_line)
-        show_notification("info", f"Adjusted dimensions from {original_width}x{original_height} to {imt_width}x{imt_height}")
+        show_notification(
+            "info",
+            f"Adjusted dimensions from {original_width}x{original_height} to {imt_width}x{imt_height}",
+        )
         p.width = imt_width
         p.height = imt_height
         return p
 
-    def imt_process_multipleof8_safeguard(self,
-                                          p: StableDiffusionProcessingImg2Img) -> StableDiffusionProcessingImg2Img:
+    def imt_process_multipleof8_safeguard(
+        self, p: StableDiffusionProcessingImg2Img
+    ) -> StableDiffusionProcessingImg2Img:
         """
         Automatically round up width and height to the nearest multiple of ROUND_FACTOR
         :param p: img2img job data
@@ -492,9 +528,7 @@ class MaskDimensionsScript(scripts.Script):
         if old_height % ROUND_FACTOR:
             p.height = round_by_factor(old_height)
         if p.width != old_width or p.height != old_height:
-            msg = (
-                f"Adjusted dimensions from {old_width}x{old_height} to {p.width}x{p.height}"
-            )
+            msg = f"Adjusted dimensions from {old_width}x{old_height} to {p.width}x{p.height}"
             show_notification("info", msg)
             logger.info(msg)
         return p

@@ -23,8 +23,8 @@ def get_canvas_uuid(params: dict) -> str:
     :return: UUID string
     """
     ui_html: str = params.get("value")
-    idx_start: int = ui_html.index("id=\"container_uuid_") + len("id=\"container_uuid_")
-    idx_end: int = ui_html.index("\">", idx_start)
+    idx_start: int = ui_html.index('id="container_uuid_') + len('id="container_uuid_')
+    idx_end: int = ui_html.index('">', idx_start)
     return ui_html[idx_start:idx_end]
 
 
@@ -50,6 +50,7 @@ def show_notification(level: str, message: str):
     :param level: ["info", "warning", "error"]
     :param message: message to show
     """
+
     # Exception to stderr
     def __stderr(ex: Exception):
         print("Can't enqueue a notification", file=sys.stderr)
